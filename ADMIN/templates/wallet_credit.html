@@ -1,0 +1,103 @@
+{% extends "_layout.html" %}
+{% block title %}Add to wallet{% endblock %}
+{% block content %}
+<style>
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:18px;display:grid;gap:10px;max-width:560px}
+.box h3{font-size:14px}
+.box label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+.hint2{font-size:12px;color:var(--muted);line-height:1.5}
+.row2{display:flex;gap:10px}
+.row2 .inp{flex:1}
+.who{padding:12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)}
+.who b{font-size:15px;display:block}
+.who small{display:block;font-size:12px;color:var(--muted);margin-top:3px}
+.sub{display:block;font-size:11px;color:var(--muted);margin-top:2px;white-space:normal}
+select.inp option{background:#13132a}
+</style>
+
+<div class="box">
+  <h3>Add money to a player's wallet</h3>
+  <p class="hint2">Use this when we made a mistake (for example a payment was wrongly rejected). The player gets a notification: "Sorry for our fault, we have added money to your wallet."</p>
+  <label>Free Fire UID (or account ID) of the player
+    <div class="row2"><input class="inp" id="wcQuery" autocomplete="off" placeholder="e.g. 1234567890">
+    <button class="btn" type="button" id="wcFind">Find player</button></div></label>
+  <p class="err" id="wcErr"></p>
+
+  <div class="who" id="wcPlayer" hidden>
+    <b id="wcName"></b><small id="wcUid"></small><small id="wcBal"></small>
+  </div>
+
+  <div id="wcForm" hidden style="display:none;gap:10px">
+    <label>Amount (₹)
+      <input class="inp" id="wcAmt" type="number" min="1" max="10000" placeholder="Amount"></label>
+    <label>Add to
+      <select class="inp" id="wcWhich">
+        <option value="deposited">Deposited (for entry fees, cannot be withdrawn)</option>
+        <option value="winnings">Winnings (player can withdraw it)</option>
+      </select></label>
+    <label>Reason (only for your record, the player does not see it)
+      <input class="inp" id="wcReason" maxlength="80" autocomplete="off" placeholder="e.g. Payment wrongly rejected"></label>
+    <button class="btn primary wide" type="button" id="wcAdd">Add to wallet and notify player</button>
+  </div>
+</div>
+
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Time</th><th>Player</th><th>Amount</th><th>Added to</th><th>Reason</th></tr>
+  {% for r in items %}
+  <tr>
+    <td>{{ r.when }}</td>
+    <td><b>{{ r.ign or 'Player' }}</b><span class="sub">Free Fire UID {{ r.game_uid or '—' }}</span></td>
+    <td><b>₹{{ r.amount|inr }}</b></td>
+    <td>{{ r.balance|capitalize }}</td>
+    <td style="white-space:normal">{{ r.reason }}</td>
+  </tr>
+  {% endfor %}
+  {% if not items %}<tr><td colspan="5" style="color:var(--muted)">Nothing added yet.</td></tr>{% endif %}
+</table>
+</div>
+
+<script>
+(function () {
+  var $ = function (i) { return document.getElementById(i); };
+  var fmt = function (n) { return Number(n).toLocaleString('en-IN'); };
+  var found = null, busy = false;
+
+  $('wcFind').addEventListener('click', function () {
+    if (busy) return;
+    var q = $('wcQuery').value.trim();
+    $('wcErr').textContent = ''; found = null;
+    $('wcPlayer').hidden = true; $('wcForm').style.display = 'none';
+    if (!q) { $('wcErr').textContent = 'Enter the Free Fire UID first.'; return; }
+    busy = true;
+    window.api('/wallet-credit/find', { query: q }).then(function (r) {
+      busy = false;
+      if (!r.ok) { $('wcErr').textContent = r.error || 'Could not find the player.'; return; }
+      found = r;
+      $('wcName').textContent = r.ign || 'Player';
+      $('wcUid').textContent = 'Free Fire UID ' + (r.game_uid || '—');
+      $('wcBal').textContent = 'Balance ₹' + fmt(r.total) + ' (Deposited ₹' + fmt(r.deposited) + ', Winnings ₹' + fmt(r.winnings) + ', Bonus ₹' + fmt(r.bonus) + ')';
+      $('wcPlayer').hidden = false; $('wcForm').style.display = 'grid';
+    });
+  });
+
+  $('wcAdd').addEventListener('click', function () {
+    if (busy || !found) return;
+    var a = parseInt($('wcAmt').value, 10), why = $('wcReason').value.trim();
+    $('wcErr').textContent = '';
+    if (!a || a < 1 || a > 10000) { $('wcErr').textContent = 'Enter an amount from 1 to 10000.'; return; }
+    if (why.length < 3) { $('wcErr').textContent = 'Write a short reason for your record.'; return; }
+    if (!confirm('Add \u20B9' + fmt(a) + ' to ' + (found.ign || 'this player') + '\'s wallet and send them a notification? This cannot be undone.')) return;
+    busy = true; this.disabled = true;
+    var btn = this;
+    window.api('/wallet-credit/add', { query: found.uid, amount: String(a), balance: $('wcWhich').value, reason: why }).then(function (r) {
+      busy = false; btn.disabled = false;
+      if (!r.ok) { $('wcErr').textContent = r.error || 'Something went wrong.'; return; }
+      window.toast(r.notified === 'sent' ? 'Added. Player notified.'
+        : r.notified === 'no_device' ? 'Added. Player has notifications off.' : 'Added. Notification failed.');
+      setTimeout(function () { location.reload(); }, 1500);
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "_layout.html" %}
+{% block title %}Notifications{% endblock %}
+{% block actions %}{% if items %}<button class="btn" type="button" id="clrAll">Clear send history</button>{% endif %}{% endblock %}
+{% block content %}
+<style>
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:18px;display:grid;gap:10px;max-width:560px}
+.box label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+.hint2{font-size:12px;color:var(--muted)}
+.pill.sent{color:var(--gold);background:rgba(251,191,36,.15)}
+.pill.delivered{color:var(--green);background:rgba(74,222,128,.15)}
+.pill.failed{color:#fca5a5;background:rgba(239,68,68,.15)}
+.pill.no_device{color:var(--muted);background:rgba(255,255,255,.07)}
+.sub{display:block;font-size:11px;color:var(--muted);margin-top:2px;white-space:normal}
+.empty{padding:18px;text-align:center;color:var(--muted)}
+</style>
+
+<div class="box">
+  <p class="hint2">Players with push notifications enabled on a registered device: <b>{{ devices }}</b></p>
+  <label>Send to (type <b>all</b>, or one player's Free Fire UID)
+    <input class="inp" id="nTarget" value="all" autocomplete="off"></label>
+  <label>Title <input class="inp" id="nTitle" maxlength="60" placeholder="Important account update"></label>
+  <label>Message <input class="inp" id="nBody" maxlength="200" placeholder="Enter a clear, professional message for the player."></label>
+  <label>In-app page to open when tapped
+    <select class="inp" id="nLink">
+      <option value="/">Home</option>
+      <option value="/matches" selected>My Matches</option>
+      <option value="/wallet">Wallet</option>
+      <option value="/profile">Profile</option>
+    </select>
+  </label>
+  <p class="hint2">Each recipient receives an in-app notification. Push delivery requires a registered device with push notifications enabled.</p>
+  <p class="err" id="nErr"></p>
+  <button class="btn primary wide" id="nSend" type="button">Send notification</button>
+</div>
+
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Time</th><th>Player</th><th>Message</th><th>Status</th></tr>
+  {% for n in items %}
+  <tr>
+    <td>{{ n.when }}</td>
+    <td><b>{{ n.ign or 'Player' }}</b><span class="sub">UID {{ n.game_uid or '—' }}</span></td>
+    <td><b>{{ n.title }}</b><span class="sub">{{ n.body }}</span></td>
+    <td>
+      {% if n.delivered_ts %}<span class="pill delivered">Delivered ✓</span><span class="sub">{{ n.got }}</span>
+      {% else %}<span class="pill {{ n.push_status }}">{{ n.push_status|replace('_', ' ')|capitalize }}</span>{% endif %}
+      {% if n.error %}<span class="sub">{{ n.error }}</span>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  {% if not items %}<tr><td class="empty" colspan="4">No notifications have been sent yet.</td></tr>{% endif %}
+</table>
+</div>
+
+<script>
+document.getElementById('nSend').addEventListener('click', function () {
+  var b = this, err = document.getElementById('nErr'); err.textContent = ''; b.disabled = true;
+  window.api('/notify/send', {
+    target: document.getElementById('nTarget').value, title: document.getElementById('nTitle').value,
+    body: document.getElementById('nBody').value, link: document.getElementById('nLink').value
+  }).then(function (res) {
+    b.disabled = false;
+    if (!res.ok) { err.textContent = res.error || 'Could not send.'; return; }
+    window.toast('Saved in Firebase inbox: ' + res.inbox_saved + ' • Push delivered: ' + res.sent + ' • Failed: ' + res.failed + ' • No device: ' + res.no_device);
+    setTimeout(function () { location.reload(); }, 1200);
+  });
+});
+var clearButton = document.getElementById('clrAll');
+if (clearButton) clearButton.addEventListener('click', function () {
+  if (!confirm('Clear admin notification send history? This does not remove notifications from players’ inboxes.')) return;
+  window.api('/notify/clear', {}).then(function (r) {
+    window.toast(r.ok ? 'Send history cleared.' : (r.error || 'Could not clear send history.'));
+    setTimeout(function () { location.reload(); }, 800);
+  });
+});
+</script>
+{% endblock %}

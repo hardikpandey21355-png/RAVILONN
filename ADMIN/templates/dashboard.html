@@ -1,0 +1,22 @@
+{% extends "_layout.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block actions %}<a class="btn primary" href="{{ url_for('tournaments') }}">+ Create tournament</a>{% endblock %}
+{% block content %}
+
+<section class="cards">
+  <div class="card"><small><i class="dot live"></i>Live now</small><b>{{ c.live }}</b></div>
+  <div class="card"><small>Upcoming</small><b>{{ c.upcoming }}</b></div>
+  <div class="card"><small>Completed</small><b>{{ c.completed }}</b></div>
+  <div class="card"><small>Slots filled</small><b>{{ c.joined }}<span> / {{ c.slots }}</span></b></div>
+</section>
+
+{% if c.total == 0 %}
+<section class="empty">
+  <div class="e-ico"><svg class="i" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/></svg></div>
+  <b>No tournaments yet</b>
+  <p>Create your first tournament. It will appear on the player Home page automatically.</p>
+  <a class="btn primary" href="{{ url_for('tournaments') }}">+ Create tournament</a>
+</section>
+{% endif %}
+
+{% endblock %}

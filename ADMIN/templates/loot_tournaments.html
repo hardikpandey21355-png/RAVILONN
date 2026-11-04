@@ -1,0 +1,218 @@
+{% extends "_layout.html" %}
+{% block title %}Loot tournaments{% endblock %}
+{% block content %}
+<style>
+.gold{color:#f7d774}
+.hint2{font-size:12px;color:var(--muted);line-height:1.6;max-width:760px;margin-bottom:16px}
+.h3{font-size:14px;font-weight:600;margin:24px 0 10px;color:#f7d774}
+.dlist{display:grid;gap:12px;max-width:760px}
+.dcard{background:var(--panel);border:1px solid rgba(247,215,116,.35);border-radius:16px;padding:16px}
+.dtop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.dtop b{font-size:15px}
+.dtop small{display:block;font-size:12px;color:var(--muted);margin-top:4px;line-height:1.6}
+.drow{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.drow .inp{flex:1;min-width:200px}
+.ddel{height:32px;padding:0 12px;font-size:12px;color:#fca5a5;border-color:rgba(239,68,68,.5)}
+.free-note{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.15em;color:#3b2402;padding:4px 12px;border-radius:999px;background:linear-gradient(100deg,#c98a12,#f7d774,#fff7d6,#f7d774)}
+.sec-title{font-size:14px;font-weight:600;color:#fff;margin-top:6px}
+.prize-box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.prow{display:flex;align-items:center;gap:10px}
+.plab{width:44px;font-size:13px;font-weight:600;color:var(--gold)}
+.pin{flex:1;display:flex;align-items:center;gap:8px;font-size:15px;color:var(--muted)}
+.pdel{width:40px;height:40px;border-radius:10px;font-size:20px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#fca5a5}
+.padd{height:40px;border-radius:12px;font-size:13px;font-weight:600;color:#f7d774;background:rgba(247,215,116,.1);border:1px dashed rgba(247,215,116,.6)}
+.padd:disabled{opacity:.4;cursor:not-allowed}
+.ptotal{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding-top:8px;border-top:1px solid var(--line)}
+.ptotal+.ptotal{border-top:0;padding-top:0}
+.ptotal b{color:var(--green);font-size:15px}
+.nopos{font-size:12px;color:var(--muted)}
+</style>
+
+<p class="hint2"><span class="free-note">FREE ENTRY</span><br>
+Loot matches are free for players (no entry fee) and run only on <b>Saturday</b> and <b>Sunday</b>. Plan 2 matches for Saturday and 2 for Sunday. They show on the player's Loot page, not on Home or Tournaments. Room ID and Results are added from the <a href="{{ url_for('tournaments') }}" class="gold"><b>Tournaments</b></a> page, where loot matches are marked LOOT.</p>
+
+<!-- default loot matches -->
+<div class="h3">Default loot matches</div>
+{% if not defaults %}
+<p class="hint2">No default yet. Create a loot match below and tick "Also save as default". Next time you only pick the start time.</p>
+{% else %}
+<div class="dlist">
+  {% for t in defaults %}
+  <div class="dcard" data-id="{{ t.id }}">
+    <div class="dtop">
+      <div><b>{{ t.name }}</b>
+        <small>Free entry • {{ t.slots }} slots • {{ t.duration_min }} min • ₹{{ t.per_kill|inr }} per kill • Prize pool ₹{{ t.prize|inr }}</small></div>
+      <button class="btn ddel" type="button">Remove</button>
+    </div>
+    <div class="drow">
+      <input class="inp dst" type="datetime-local" aria-label="Start date and time (Saturday or Sunday)">
+      <button class="btn primary dgo" type="button">Create</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- create form -->
+<div class="h3">Create loot match</div>
+<form class="tform" method="post" enctype="multipart/form-data" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+
+  <label class="wide-col">Match name
+    <input class="inp" type="text" name="mode" maxlength="30" required placeholder="e.g. LOOT BR SOLO" value="{{ f.get('mode', '') }}">
+  </label>
+
+  <label>Team type
+    <select class="inp" id="team" name="team">
+      {% set cur = f.get('team', 'Solo') %}
+      {% for t in ['Solo', 'Duo', 'Squad'] %}<option value="{{ t }}" {{ 'selected' if cur == t }}>{{ t }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Match type (map)
+    <input class="inp" type="text" name="map" maxlength="20" required placeholder="e.g. Bermuda" value="{{ f.get('map', '') }}">
+  </label>
+
+  <label>Slots (auto-filled from team type, you can change it)
+    <input class="inp" type="number" id="slots" name="slots" min="2" max="1000" required value="{{ f.get('slots', '48') }}">
+  </label>
+  <label>Duration (minutes)
+    <input class="inp" type="number" name="duration" min="5" max="240" required value="{{ f.get('duration', '25') }}">
+  </label>
+
+  <label class="wide-col">Start date and time (Saturday or Sunday only)
+    <input class="inp" type="datetime-local" name="start" required value="{{ f.get('start', '') }}">
+  </label>
+
+  <div class="wide-col">
+    <div class="sec-title">Prize pool</div>
+    <p style="font-size:12px;color:var(--muted);margin:2px 0 10px">Position prizes are optional. Prize pool = (slots − 1) × reward per kill + all position prizes. There is no entry fee.</p>
+    <div class="prize-box">
+      <p class="nopos" id="noPos">No position prizes added. Only the per-kill reward is paid.</p>
+      <div id="rows">
+        {% for v in f.getlist('place_amt') %}
+        <div class="prow">
+          <span class="plab">{{ loop.index }}</span>
+          <div class="pin">₹<input class="inp" type="number" name="place_amt" min="0" max="1000000" required placeholder="Amount" value="{{ v }}"></div>
+          <button type="button" class="pdel" aria-label="Remove position">−</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="padd" id="addPos">+ Add position</button>
+      <div class="ptotal"><span>Per kill pool (<span id="kn">0</span> × ₹<span id="kv">0</span>)</span><b id="kpool">₹0</b></div>
+      <div class="ptotal"><span>Position prizes</span><b id="ppool">₹0</b></div>
+      <div class="ptotal"><span>Total prize pool</span><b id="total">₹0</b></div>
+    </div>
+  </div>
+
+  <label>Reward per kill (₹)
+    <input class="inp" type="number" id="perKill" name="per_kill" min="0" max="10000" required value="{{ f.get('per_kill', '0') }}">
+  </label>
+  <div></div>
+
+  <label>Banner (pick an existing image, golden ones look best)
+    <select class="inp" name="banner_pick">
+      <option value="">Default loot banner</option>
+      {% for img in images %}<option value="{{ img }}" {{ 'selected' if f.get('banner_pick') == img }}>{{ img }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Or upload a new banner (JPG, PNG, WEBP)
+    <input class="inp" type="file" name="banner" accept=".jpg,.jpeg,.png,.webp" style="padding-top:11px">
+  </label>
+
+  <label class="wide-col" style="flex-direction:row;align-items:center;gap:10px;color:#fff;font-size:13px">
+    <input type="checkbox" name="save_default" value="1" style="width:18px;height:18px" {{ 'checked' if f.get('save_default') }}>
+    Also save this as a default loot match (next time you only pick the start time)
+  </label>
+  {% if error %}<p class="err wide-col">{{ error }}</p>{% endif %}
+
+  <div class="wide-col"><button class="btn primary wide" type="submit">Create loot match</button></div>
+</form>
+
+<!-- created loot matches -->
+<div class="h3">Loot matches</div>
+{% if not items %}
+<p class="hint2">No loot match created yet.</p>
+{% else %}
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Name</th><th>Team • Map</th><th>Prize</th><th>Players</th><th>Start</th><th>Status</th><th></th></tr>
+  {% for t in items %}
+  <tr>
+    <td><b>{{ t.mode }}</b></td>
+    <td>{{ t.team }} • {{ t.map }}</td>
+    <td>₹{{ t.prize|inr }}</td>
+    <td>{{ t.joined }} / {{ t.slots }}</td>
+    <td>{{ t.when }}</td>
+    <td><span class="pill {{ t.status }}">{{ t.status|capitalize }}</span></td>
+    <td style="display:flex;gap:8px">
+      <a class="btn" href="{{ url_for('tournaments') }}">Room / Results</a>
+      <form method="post" action="{{ url_for('tournament_delete', tid=t.id) }}" onsubmit="return confirm('Delete this loot match?')">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="btn" type="submit">Delete</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+
+<script>
+(function () {
+  var MAXPOS = 20, busy = false;
+  var $ = function (i) { return document.getElementById(i); };
+  var rows = $('rows'), addBtn = $('addPos'), slots = $('slots'), perKill = $('perKill');
+  var fmt = function (n) { return n.toLocaleString('en-IN'); };
+  function ord(n) {
+    var s = (n % 100 >= 11 && n % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+    return n + s;
+  }
+  function refresh() {
+    var list = rows.querySelectorAll('.prow'), pos = 0;
+    list.forEach(function (r, i) {
+      r.querySelector('.plab').textContent = ord(i + 1);
+      pos += parseInt(r.querySelector('input').value, 10) || 0;
+    });
+    addBtn.disabled = list.length >= MAXPOS;
+    $('noPos').hidden = list.length > 0;
+    var n = Math.max((parseInt(slots.value, 10) || 0) - 1, 0), pk = parseInt(perKill.value, 10) || 0, kp = n * pk;
+    $('kn').textContent = n; $('kv').textContent = fmt(pk);
+    $('kpool').textContent = '₹' + fmt(kp); $('ppool').textContent = '₹' + fmt(pos); $('total').textContent = '₹' + fmt(kp + pos);
+  }
+  addBtn.addEventListener('click', function () {
+    var d = document.createElement('div'); d.className = 'prow';
+    d.innerHTML = '<span class="plab"></span><div class="pin">₹<input class="inp" type="number" name="place_amt" min="0" max="1000000" required placeholder="Amount"></div>' +
+                  '<button type="button" class="pdel" aria-label="Remove position">\u2212</button>';
+    rows.appendChild(d); refresh(); d.querySelector('input').focus();
+  });
+  rows.addEventListener('click', function (e) { var b = e.target.closest('.pdel'); if (b) { b.closest('.prow').remove(); refresh(); } });
+  rows.addEventListener('input', refresh);
+  perKill.addEventListener('input', refresh);
+
+  var dirty = false, defaults = { Solo: 48, Duo: 24, Squad: 12 };
+  slots.addEventListener('input', function () { dirty = true; refresh(); });
+  $('team').addEventListener('change', function (e) { if (!dirty && defaults[e.target.value]) slots.value = defaults[e.target.value]; refresh(); });
+  refresh();
+
+  // default loot matches: pick start time and create, or remove
+  document.addEventListener('click', function (e) {
+    var card = e.target.closest('.dcard'); if (!card || busy) return;
+    var id = card.dataset.id;
+    if (e.target.closest('.dgo')) {
+      var st = card.querySelector('.dst').value;
+      if (!st) { window.toast('Choose the start date and time first.'); return; }
+      busy = true;
+      window.api('/loot/from-default/' + id, { start: st }).then(function (r) {
+        busy = false;
+        if (!r.ok) { window.toast(r.error || 'Something went wrong.'); return; }
+        window.toast('Loot match created.'); setTimeout(function () { location.reload(); }, 800);
+      });
+    } else if (e.target.closest('.ddel')) {
+      if (!confirm('Remove this default? Matches already created are not affected.')) return;
+      busy = true;
+      window.api('/loot/default/' + id + '/delete', {}).then(function () { busy = false; location.reload(); });
+    }
+  });
+})();
+</script>
+{% endblock %}

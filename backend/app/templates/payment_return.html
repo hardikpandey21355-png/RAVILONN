@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>RIVALON · Payment</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #070b0a;
+        color: #effff8;
+      }
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: #080b0a;
+      }
+      main {
+        width: min(100%, 440px);
+        padding: 32px 26px;
+        text-align: center;
+        border: 1px solid #252b29;
+        border-radius: 22px;
+        background: #111513;
+      }
+      .mark {
+        width: 52px;
+        height: 52px;
+        display: grid;
+        place-items: center;
+        margin: 0 auto 18px;
+        border: 1px solid #2e5147;
+        border-radius: 50%;
+        color: #72dfbd;
+        background: #17241f;
+        font-size: 26px;
+      }
+      h1 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+      p { margin: 9px 0 24px; color: #a9b5b0; line-height: 1.5; }
+      a {
+        display: block;
+        padding: 15px 18px;
+        border: 1px solid #55cba8;
+        border-radius: 14px;
+        color: #06120e;
+        background: #65d8b5;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .brand { margin-top: 20px; color: #87948e; font-size: 12px; letter-spacing: .2em; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">
+        {% if status == "paid" %}✓{% elif status == "pending" %}…{% else %}×{% endif %}
+      </div>
+      {% if status == "paid" %}
+        <h1>Payment received</h1>
+        <p>Your wallet is updated.</p>
+      {% elif status == "pending" %}
+        <h1>Payment is being confirmed</h1>
+        <p>Your wallet updates shortly.</p>
+      {% else %}
+        <h1>Payment failed</h1>
+        <p>No money was added to your wallet.</p>
+      {% endif %}
+      <a id="open-app" href="rivalon://wallet?pay={{ status }}">Continue with RIVALON</a>
+      <div class="brand">RIVALON</div>
+    </main>
+    <script>
+      window.setTimeout(function () {
+        window.location.href = document.getElementById("open-app").href;
+      }, 1000);
+    </script>
+  </body>
+</html>

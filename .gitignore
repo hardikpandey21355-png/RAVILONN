@@ -1,0 +1,43 @@
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+**/serviceAccount*.json
+**/service-account*.json
+**/*service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Flutter and Dart build output
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+*.symbols
+*.map.json
+
+# Android local state and generated output
+local.properties
+.gradle/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*.iml
+*.log
+
+# Preserved metadata from the former standalone Admin repository
+ADMIN/.git-previous/

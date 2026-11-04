@@ -1,0 +1,67 @@
+{% extends "_layout.html" %}
+{% block title %}Default tournaments{% endblock %}
+{% block actions %}<a class="btn primary" href="{{ url_for('tournament_new') }}">+ Create tournament</a>{% endblock %}
+{% block content %}
+<style>
+.hint2{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5;max-width:760px}
+.dlist{display:grid;gap:12px;max-width:760px}
+.dcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.dtop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.dtop b{font-size:15px}
+.dtop small{display:block;font-size:12px;color:var(--muted);margin-top:4px;line-height:1.6}
+.drow{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.drow .inp{flex:1;min-width:200px}
+.ddel{height:32px;padding:0 12px;font-size:12px;color:#fca5a5;border-color:rgba(239,68,68,.5)}
+</style>
+
+{% if not items %}
+<section class="empty">
+  <div class="e-ico"><svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg></div>
+  <b>No default tournaments yet</b>
+  <p>Create a tournament and tick "Also save this as a default tournament". It will appear here, and next time you only pick the start time.</p>
+  <a class="btn primary" href="{{ url_for('tournament_new') }}">+ Create tournament</a>
+</section>
+{% else %}
+<p class="hint2">Pick the start date and time, then press <b>Create</b>. Everything else is filled from the default. <b>Remove</b> only deletes the default, tournaments already created are not affected.</p>
+<div class="dlist">
+  {% for t in items %}
+  <div class="dcard" data-id="{{ t.id }}">
+    <div class="dtop">
+      <div><b>{{ t.name }}</b>
+        <small>Fee ₹{{ t.fee|inr }} • {{ t.slots }} slots • {{ t.duration_min }} min • ₹{{ t.per_kill|inr }} per kill • Prize pool ₹{{ t.prize|inr }}</small></div>
+      <button class="btn ddel" type="button">Remove</button>
+    </div>
+    <div class="drow">
+      <input class="inp dst" type="datetime-local" aria-label="Start date and time">
+      <button class="btn primary dgo" type="button">Create</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+(function () {
+  var busy = false;
+  document.addEventListener('click', function (e) {
+    var card = e.target.closest('.dcard'); if (!card || busy) return;
+    var id = card.dataset.id;
+    if (e.target.closest('.dgo')) {
+      var st = card.querySelector('.dst').value;
+      if (!st) { window.toast('Choose the start date and time first.'); return; }
+      busy = true;
+      window.api('/tournaments/from-default/' + id, { start: st }).then(function (r) {
+        busy = false;
+        if (!r.ok) { window.toast(r.error || 'Something went wrong.'); return; }
+        window.toast('Tournament created.');
+        setTimeout(function () { location.href = '/tournaments'; }, 800);
+      });
+    } else if (e.target.closest('.ddel')) {
+      if (!confirm('Remove this default tournament? Tournaments already created are not affected.')) return;
+      busy = true;
+      window.api('/tournaments/default/' + id + '/delete', {}).then(function () { busy = false; location.reload(); });
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

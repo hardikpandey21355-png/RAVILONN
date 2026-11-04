@@ -1,0 +1,226 @@
+{% extends "_layout.html" %}
+{% block title %}Match result{% endblock %}
+{% block actions %}<a class="btn" href="{{ url_for('tournaments') }}">Back</a>{% endblock %}
+{% block content %}
+{% set t = c.t %}
+<style>
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.sum .card b{font-size:20px}
+.prizes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;font-size:12px;color:var(--muted)}
+.prizes span{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 10px}
+.prizes b{color:var(--gold)}
+.msg{padding:11px 14px;border-radius:12px;font-size:13px;margin-bottom:14px}
+.msg.ok{color:var(--green);background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.4)}
+.msg.bad{color:#fca5a5;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4)}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:18px}
+.box h3{font-size:14px;margin-bottom:10px}
+.box h3 small{color:var(--muted);font-weight:400}
+.drop{display:grid;place-items:center;text-align:center;gap:4px;min-height:90px;padding:14px;border-radius:14px;cursor:pointer;
+  border:2px dashed rgba(168,85,247,.6);background:rgba(168,85,247,.08);font-size:13px;color:#c4b5fd}
+.drop small{color:var(--muted);font-size:11px}
+.drop.over,.drop:focus{outline:0;background:rgba(168,85,247,.2)}
+#prev{display:block;width:100%;max-height:420px;object-fit:contain;margin-top:12px;border-radius:12px;border:1px solid var(--line);background:#000}
+
+/* player rows */
+.plhead,.pl{display:grid;grid-template-columns:minmax(150px,1.6fr) 84px 150px 130px 112px;gap:10px;align-items:center}
+.plhead{font-size:11px;color:var(--muted);padding:0 4px 8px}
+.pl{padding:10px 4px;border-top:1px solid #1a1a33}
+.pl .who b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl .who small{display:block;color:var(--muted);font-size:11px}
+.pl .who .calc{color:#c4b5fd;margin-top:2px}
+.pl .inp{height:42px;padding:0 10px}
+.pl select.inp option{background:#13132a}
+.pl.paid{opacity:.7}
+.pl .btn{height:42px;width:100%;padding:0 10px}
+.paidtag{color:var(--green);font-weight:600;font-size:13px}
+.tot{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin:14px 0;padding-top:12px;border-top:1px solid var(--line)}
+.tot b{color:var(--green);font-size:16px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hint{font-size:11px;color:var(--muted);margin-top:10px}
+@media (max-width:900px){
+  .plhead{display:none}
+  .pl{grid-template-columns:1fr 1fr}
+  .pl .who{grid-column:1/-1}
+}
+</style>
+
+<div class="sum">
+  <div class="card"><small>Match</small><b>{{ t.mode }}</b></div>
+  <div class="card"><small>{{ t.team }} • {{ t.map }}</small><b>{{ t.joined }} / {{ t.slots }}</b></div>
+  <div class="card"><small>Prize pool</small><b>₹{{ t.prize|inr }}</b></div>
+  <div class="card"><small>Per kill</small><b>₹{{ t.per_kill|inr }}</b></div>
+</div>
+{% if c.prizes %}
+<div class="prizes">
+  {% for place, amt in c.prizes %}<span>{{ place }}: <b>₹{{ amt|inr }}</b></span>{% endfor %}
+</div>
+{% endif %}
+
+{% if t.status != 'completed' %}
+<p class="msg bad">This match has not ended yet. Results can be added after it ends.</p>
+{% else %}
+
+<!-- screenshot: optional, saved as soon as it is added -->
+<div class="box">
+  <h3>Result screenshot <small>(optional)</small></h3>
+  <label class="drop" id="drop" tabindex="0">
+    <span><b>Press Ctrl+V to paste</b> the screenshot here</span>
+    <small>or click to choose a file, or drop it • JPG, PNG, WEBP • saved right away</small>
+    <input type="file" id="shot" accept=".jpg,.jpeg,.png,.webp" hidden>
+  </label>
+  <a id="prevLink" href="{{ url_for('result_shot', tid=t.id) if c.screenshot else '#' }}" target="_blank">
+    <img id="prev" alt="Result screenshot" {% if c.screenshot %}src="{{ url_for('result_shot', tid=t.id) }}"{% else %}hidden{% endif %}>
+  </a>
+</div>
+
+<!-- players -->
+<div class="box">
+  <h3>Players ({{ c.rows|length }})</h3>
+  {% if not c.rows %}
+  <p style="font-size:13px;color:var(--muted)">No player joined this match.</p>
+  {% else %}
+  <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Enter each player's kills and pick their position. The reward is worked out for you, and you can change it before approving.</p>
+  <div class="plhead"><span>Player</span><span>Kills</span><span>Position</span><span>Reward (₹)</span><span></span></div>
+  <div id="plist">
+    {% for r in c.rows %}
+    <div class="pl {{ 'paid' if r.paid }}" data-uid="{{ r.uid }}" data-paid="{{ 1 if r.paid else 0 }}">
+      <div class="who"><b>{{ r.ign or 'Player' }}</b><small>UID {{ r.game_uid or '—' }}</small><small class="calc"></small></div>
+      <input class="inp k" type="number" min="0" max="99" value="{{ r.kills }}" aria-label="Kills" placeholder="Kills" {{ 'disabled' if r.paid }}>
+      <select class="inp ps" aria-label="Position" {{ 'disabled' if r.paid }}>
+        <option value="0">No position</option>
+        {% for place, amt in c.prizes %}
+        <option value="{{ loop.index }}" {{ 'selected' if r.place == loop.index }}>{{ place }} • ₹{{ amt|inr }}</option>
+        {% endfor %}
+      </select>
+      <input class="inp am" type="number" min="0" max="1000000" value="{{ r.amount }}" aria-label="Reward" placeholder="₹ reward" {{ 'disabled' if r.paid }}>
+      <div class="act">{% if r.paid %}<span class="paidtag">✓ Paid</span>{% else %}<button type="button" class="btn primary ap">Approve</button>{% endif %}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div id="foot" {{ 'hidden' if c.unpaid == 0 }}>
+    <div class="tot"><span><span id="cnt">0</span> players to pay • Total</span><b id="total">₹0</b></div>
+    <p class="msg bad" id="err" hidden></p>
+    <div class="acts">
+      <button class="btn" type="button" id="saveBtn">Save draft</button>
+      <button class="btn primary" type="button" id="allBtn">Approve all</button>
+    </div>
+    <p class="hint">Approve adds the reward to that player's Winnings. Each player is paid once and it cannot be undone. Approve all pays every unpaid player shown above.</p>
+  </div>
+  {% endif %}
+</div>
+
+<script type="application/json" id="cfg">{{ {'per_kill': t.per_kill, 'prizes': c.amounts, 'labels': c.labels, 'save': url_for('result_save', tid=t.id), 'approve': url_for('result_approve', tid=t.id), 'shot': url_for('result_screenshot', tid=t.id)}|tojson }}</script>
+<script>
+(function () {
+  var cfg = JSON.parse(document.getElementById('cfg').textContent);
+  var $ = function (i) { return document.getElementById(i); };
+  var fmt = function (v) { return Number(v).toLocaleString('en-IN'); };
+  var csrf = (document.querySelector('meta[name="csrf"]') || {}).content || '';
+
+  // ---- screenshot: paste, drop or choose (optional, saved right away) ----
+  var input = $('shot'), drop = $('drop'), prev = $('prev'), link = $('prevLink');
+  function upload(f) {
+    if (!f || f.type.indexOf('image/') !== 0) return;
+    var ext = f.type.split('/')[1].replace('jpeg', 'jpg');
+    var file = new File([f], 'shot.' + ext, { type: f.type });
+    var fd = new FormData(); fd.append('shot', file); fd.append('csrf', csrf);
+    prev.src = URL.createObjectURL(file); link.href = prev.src; prev.hidden = false;
+    fetch(cfg.shot, { method: 'POST', headers: { 'X-CSRF': csrf }, body: fd })
+      .then(function (r) { return r.json(); })
+      .catch(function () { return { ok: false, error: 'Network problem. Try again.' }; })
+      .then(function (res) { toast(res.ok ? 'Screenshot saved.' : (res.error || 'Could not save the screenshot.')); });
+  }
+  document.addEventListener('paste', function (e) {
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image/') === 0) { upload(items[i].getAsFile()); e.preventDefault(); return; }
+    }
+  });
+  input.addEventListener('change', function () { var f = input.files[0]; if (f) upload(f); });
+  ['dragover', 'dragenter'].forEach(function (n) { drop.addEventListener(n, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (n) { drop.addEventListener(n, function () { drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function (e) { e.preventDefault(); upload(e.dataTransfer.files[0]); });
+
+  // ---- players ----
+  var list = $('plist');
+  if (!list) return;
+  var rows = [].slice.call(list.querySelectorAll('.pl')), foot = $('foot'), err = $('err'), busy = false;
+
+  function num(el) { return parseInt(el.value, 10) || 0; }
+  function unpaid() { return rows.filter(function (r) { return r.dataset.paid !== '1'; }); }
+  function parts(r) {
+    var k = num(r.querySelector('.k')), p = num(r.querySelector('.ps'));
+    var base = k * cfg.per_kill, pr = p ? (cfg.prizes[p - 1] || 0) : 0;
+    return { k: k, p: p, base: base, pr: pr, total: base + pr };
+  }
+  function note(r) {
+    var calc = r.querySelector('.calc');
+    if (r.dataset.paid === '1') { calc.textContent = ''; return; }
+    var x = parts(r), a = num(r.querySelector('.am')), t = [];
+    if (cfg.per_kill) t.push(x.k + ' kills × ₹' + fmt(cfg.per_kill) + ' = ₹' + fmt(x.base));
+    if (x.p) t.push(cfg.labels[x.p - 1] + ' prize ₹' + fmt(x.pr));
+    var txt = t.length ? t.join(' + ') + ' = ₹' + fmt(x.total) : '';
+    if (a !== x.total) txt += (txt ? ' • ' : '') + 'edited to ₹' + fmt(a);
+    calc.textContent = txt;
+  }
+  function totals() {
+    var u = unpaid(), s = 0;
+    u.forEach(function (r) { s += num(r.querySelector('.am')); });
+    $('cnt').textContent = u.length; $('total').textContent = '₹' + fmt(s);
+    foot.hidden = u.length === 0;
+    return s;
+  }
+  function collect(r) {
+    return { uid: r.dataset.uid, kills: num(r.querySelector('.k')), place: num(r.querySelector('.ps')), amount: num(r.querySelector('.am')) };
+  }
+  function markPaid(r) {
+    r.dataset.paid = '1'; r.classList.add('paid');
+    [].forEach.call(r.querySelectorAll('input,select'), function (x) { x.disabled = true; });
+    r.querySelector('.act').innerHTML = '<span class="paidtag">\u2713 Paid</span>';
+    r.querySelector('.calc').textContent = '';
+    totals();
+  }
+  function lock(on) {
+    [].forEach.call(document.querySelectorAll('.ap,#saveBtn,#allBtn'), function (b) { b.disabled = on; });
+  }
+  function fail(m) { err.textContent = m; err.hidden = false; toast(m); }
+  function send(url, targets, done) {
+    if (busy) return;
+    busy = true; err.hidden = true; lock(true);
+    window.api(url, { rows: targets.map(collect) }).then(function (res) {
+      busy = false; lock(false);
+      if (!res.ok) { fail(res.error || 'Something went wrong.'); return; }
+      done(res);
+    });
+  }
+
+  list.addEventListener('input', function (e) {
+    var r = e.target.closest('.pl'); if (!r || r.dataset.paid === '1') return;
+    var c = e.target.classList;
+    if (c.contains('k') || c.contains('ps')) r.querySelector('.am').value = parts(r).total;
+    note(r); totals();
+  });
+  list.addEventListener('click', function (e) {
+    var b = e.target.closest('.ap'); if (!b) return;
+    var r = b.closest('.pl'), d = collect(r), name = r.querySelector('.who b').textContent;
+    if (!confirm('Pay \u20B9' + fmt(d.amount) + ' to ' + name + '? This cannot be undone.')) return;
+    send(cfg.approve, [r], function () { markPaid(r); toast('\u20B9' + fmt(d.amount) + ' paid to ' + name + '.'); });
+  });
+  $('allBtn').addEventListener('click', function () {
+    var u = unpaid(); if (!u.length) return;
+    var s = totals();
+    if (!confirm('Pay \u20B9' + fmt(s) + ' to ' + u.length + ' players now? This cannot be undone.')) return;
+    send(cfg.approve, u, function () { u.forEach(markPaid); toast('All rewards paid.'); });
+  });
+  $('saveBtn').addEventListener('click', function () {
+    var u = unpaid(); if (!u.length) return;
+    send(cfg.save, u, function () { toast('Draft saved.'); });
+  });
+
+  rows.forEach(note);
+  totals();
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="csrf" content="{{ csrf_token() }}">
+<title>{% block title %}{% endblock %} • RudelySmash Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="side" id="side">
+    <div class="brand">
+      <i><svg class="i" viewBox="0 0 24 24"><path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></svg></i>
+      <span>RudelySmash<small>Admin</small></span>
+    </div>
+    <nav class="nav">
+      <a href="{{ url_for('dashboard') }}" class="{{ 'on' if active == 'dashboard' }}">
+        <svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Dashboard</a>
+      <a href="{{ url_for('tournaments') }}" class="{{ 'on' if active == 'tournaments' }}">
+        <svg class="i" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Tournaments</a>
+      <a href="{{ url_for('defaults') }}" class="{{ 'on' if active == 'defaults' }}">
+        <svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg>Default tournaments</a>
+      <a href="{{ url_for('loot') }}" class="{{ 'on' if active == 'loot' }}">
+        <svg class="i" viewBox="0 0 24 24"><path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/></svg>Loot tournaments</a>
+      <a href="{{ url_for('withdrawals') }}" class="{{ 'on' if active == 'withdrawals' }}">
+        <svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/><circle cx="16" cy="14" r="1"/></svg>Withdrawals{% if wd_pending %}<em class="bdg">{{ wd_pending }}</em>{% endif %}</a>
+      <a href="{{ url_for('wallet_credit') }}" class="{{ 'on' if active == 'wallet_credit' }}">
+       <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Add to wallet</a>
+      <a href="{{ url_for('payment_methods') }}" class="{{ 'on' if active == 'payment_methods' }}">
+        <svg class="i" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>Payment methods</a>
+      <a href="{{ url_for('holds') }}" class="{{ 'on' if active == 'holds' }}">
+        <svg class="i" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Account holds{% if holds_count %}<em class="bdg">{{ holds_count }}</em>{% endif %}</a>
+      <a href="{{ url_for('maintenance') }}" class="{{ 'on' if active == 'maintenance' }}">
+        <svg class="i" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6z"/></svg>Maintenance</a>
+      <a href="{{ url_for('notify') }}" class="{{ 'on' if active == 'notify' }}">
+        <svg class="i" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>Notifications</a>
+      <a href="{{ url_for('check_edit') }}" class="{{ 'on' if active == 'check_edit' }}">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5M8 10h5M10.5 7.5v5"/></svg>Check and edit</a>
+      <div class="nav-divider" role="separator"></div>
+      <div class="nav-section">To be completed</div>
+      <button class="nav-disabled" type="button" disabled aria-disabled="true" title="Coming later">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>Approve amount<span class="nav-tag">To be completed</span></button>
+      <button class="nav-disabled" type="button" disabled aria-disabled="true" title="Coming later">
+        <svg class="i" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Accounts<span class="nav-tag">To be completed</span></button>
+    </nav>
+    <form class="foot" method="post" action="{{ url_for('logout') }}">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <button class="out" type="submit"><svg class="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Log out</button>
+    </form>
+  </aside>
+
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <header class="bar">
+      <button class="menu" id="menuBtn" type="button" aria-label="Open menu" aria-controls="side" aria-expanded="false">
+        <svg class="i" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>
+      </button>
+      <h1>{{ self.title() }}</h1>
+      <div>{% block actions %}{% endblock %}</div>
+    </header>
+    <main class="page">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script src="{{ url_for('static', filename='admin.js') }}"></script>
+</body>
+</html>

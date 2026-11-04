@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "131218601501",
+    "firebase_url": "https://ravilon-19a47-default-rtdb.firebaseio.com",
+    "project_id": "ravilon-19a47",
+    "storage_bucket": "ravilon-19a47.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:131218601501:android:e6d2e2ca02273b0b0a38f4",
+        "android_client_info": {
+          "package_name": "ravilon_1.ravilon"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "131218601501-iouend9p4ggtd4dl78475cv1fhdkj96j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "ravilon_1.ravilon",
+            "certificate_hash": "cab102236098e30a91f5bbdb99c6138e3c2ccb64"
+          }
+        },
+        {
+          "client_id": "131218601501-2kufnj2hpq83f1gim4f4bodk10532203.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnILzvGdb_k19KN723zucP7slCdifZWf4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "131218601501-2kufnj2hpq83f1gim4f4bodk10532203.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,174 @@
+{% extends "_layout.html" %}
+{% block title %}Create tournament{% endblock %}
+{% block actions %}<a class="btn" href="{{ url_for('defaults') }}">Default tournaments</a> <a class="btn" href="{{ url_for('tournaments') }}">Back</a>{% endblock %}
+{% block content %}
+
+<style>
+.seg{display:flex;gap:10px}
+.seg-opt{flex:1;position:relative;cursor:pointer}
+.seg-opt input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.seg-opt span{display:flex;align-items:center;justify-content:center;height:46px;border-radius:12px;font-size:14px;font-weight:600;color:#fff;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);transition:.15s}
+.seg-opt input:checked+span{background:var(--btn);border-color:rgba(255,255,255,.35);box-shadow:0 0 14px rgba(168,85,247,.45)}
+.seg-opt input:focus-visible+span{outline:2px solid var(--purple);outline-offset:2px}
+
+.sec-title{font-size:14px;font-weight:600;color:#fff;margin-top:6px}
+.prize-box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.prow{display:flex;align-items:center;gap:10px}
+.plab{width:44px;font-size:13px;font-weight:600;color:var(--gold)}
+.pin{flex:1;display:flex;align-items:center;gap:8px;font-size:15px;color:var(--muted)}
+.pdel{width:40px;height:40px;border-radius:10px;font-size:20px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#fca5a5}
+.pdel:disabled{opacity:.35;cursor:not-allowed}
+.padd{height:40px;border-radius:12px;font-size:13px;font-weight:600;color:#c4b5fd;background:rgba(168,85,247,.12);border:1px dashed rgba(168,85,247,.6)}
+.padd:disabled{opacity:.4;cursor:not-allowed}
+.ptotal{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding-top:8px;border-top:1px solid var(--line)}
+.ptotal+.ptotal{border-top:0;padding-top:0}
+.ptotal b{color:var(--green);font-size:15px}
+.nopos{font-size:12px;color:var(--muted)}
+</style>
+
+<form class="tform" method="post" enctype="multipart/form-data" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+
+  <label class="wide-col">Tournament name
+    <input class="inp" type="text" name="mode" maxlength="30" required
+           placeholder="e.g. BR RANKED" value="{{ f.get('mode', '') }}">
+  </label>
+  <div class="wide-col">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Team type</div>
+    <div class="seg" id="teamSeg">
+      {% set cur = f.get('team', 'Solo') %}
+      {% for t in ['Solo', 'Duo', 'Squad'] %}
+      <label class="seg-opt"><input type="radio" name="team" value="{{ t }}" {{ 'checked' if cur == t }}><span>{{ t }}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <label>Map
+    <input class="inp" type="text" name="map" maxlength="20" required
+           placeholder="e.g. Bermuda" value="{{ f.get('map', '') }}">
+  </label>
+
+  <label>Entry fee (₹)
+    <input class="inp" type="number" name="fee" min="0" max="100000" required value="{{ f.get('fee', '') }}">
+  </label>
+
+  <label>Slots (auto-filled from team type, you can change it)
+    <input class="inp" type="number" id="slots" name="slots" min="2" max="1000" required value="{{ f.get('slots', '48') }}">
+  </label>
+
+  <label>Duration (minutes, match ends after this)
+    <input class="inp" type="number" name="duration" min="5" max="240" required value="{{ f.get('duration', '25') }}">
+  </label>
+
+  <label class="wide-col">Start date and time
+    <input class="inp" type="datetime-local" name="start" required value="{{ f.get('start', '') }}">
+  </label>
+
+  <!-- prizes -->
+  <div class="wide-col">
+    <div class="sec-title">Prize pool</div>
+    <p style="font-size:12px;color:var(--muted);margin:2px 0 10px">Position prizes are optional. The prize pool is (slots − 1) × reward per kill, plus all position prizes.</p>
+    <div class="prize-box">
+      <p class="nopos" id="noPos">No position prizes added. Only the per-kill reward is paid.</p>
+      <div id="rows">
+        {% set vals = f.getlist('place_amt') %}
+        {% for v in vals %}
+        <div class="prow">
+          <span class="plab">{{ loop.index }}</span>
+          <div class="pin">₹<input class="inp" type="number" name="place_amt" min="0" max="1000000" required placeholder="Amount" value="{{ v }}"></div>
+          <button type="button" class="pdel" aria-label="Remove position">−</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="padd" id="addPos">+ Add position</button>
+      <div class="ptotal"><span>Per kill pool (<span id="kn">0</span> × ₹<span id="kv">0</span>)</span><b id="kpool">₹0</b></div>
+      <div class="ptotal"><span>Position prizes</span><b id="ppool">₹0</b></div>
+      <div class="ptotal"><span>Total prize pool</span><b id="total">₹0</b></div>
+    </div>
+  </div>
+
+  <label>Reward per kill (₹)
+    <input class="inp" type="number" id="perKill" name="per_kill" min="0" max="10000" required value="{{ f.get('per_kill', '0') }}">
+  </label>
+  <div></div>
+
+  <label>Banner (pick an existing image)
+    <select class="inp" name="banner_pick">
+      <option value="">Default banner</option>
+      {% for img in images %}
+      <option value="{{ img }}" {{ 'selected' if f.get('banner_pick') == img }}>{{ img }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label>Or upload a new banner (JPG, PNG, WEBP, max 4 MB)
+    <input class="inp" type="file" name="banner" accept=".jpg,.jpeg,.png,.webp" style="padding-top:11px">
+  </label>
+
+  <label class="wide-col" style="flex-direction:row;align-items:center;gap:10px;color:#fff;font-size:13px">
+    <input type="checkbox" name="save_default" value="1" style="width:18px;height:18px" {{ 'checked' if f.get('save_default') }}>
+    Also save this as a default tournament (it will appear in the "Default tournaments" page, next time you only pick the start time)
+  </label>
+  {% if error %}<p class="err wide-col">{{ error }}</p>{% endif %}
+
+  <div class="wide-col">
+    <button class="btn primary wide" type="submit">Create tournament</button>
+  </div>
+</form>
+
+<script>
+(function () {
+  var MAXPOS = 20;
+  var $ = function (i) { return document.getElementById(i); };
+  var rows = $('rows'), addBtn = $('addPos'), slots = $('slots'), perKill = $('perKill');
+  var fmt = function (n) { return n.toLocaleString('en-IN'); };
+
+  function ord(n) {
+    var s = (n % 100 >= 11 && n % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+    return n + s;
+  }
+  function refresh() {
+    var list = rows.querySelectorAll('.prow'), pos = 0;
+    list.forEach(function (r, i) {
+      r.querySelector('.plab').textContent = ord(i + 1);
+      pos += parseInt(r.querySelector('input').value, 10) || 0;
+    });
+    addBtn.disabled = list.length >= MAXPOS;
+    $('noPos').hidden = list.length > 0;
+    var n = Math.max((parseInt(slots.value, 10) || 0) - 1, 0), pk = parseInt(perKill.value, 10) || 0, kp = n * pk;
+    $('kn').textContent = n; $('kv').textContent = fmt(pk);
+    $('kpool').textContent = '₹' + fmt(kp);
+    $('ppool').textContent = '₹' + fmt(pos);
+    $('total').textContent = '₹' + fmt(kp + pos);
+  }
+  addBtn.addEventListener('click', function () {
+    var d = document.createElement('div');
+    d.className = 'prow';
+    d.innerHTML = '<span class="plab"></span><div class="pin">₹<input class="inp" type="number" name="place_amt" min="0" max="1000000" required placeholder="Amount"></div>' +
+                  '<button type="button" class="pdel" aria-label="Remove position">\u2212</button>';
+    rows.appendChild(d);
+    refresh();
+    d.querySelector('input').focus();
+  });
+  rows.addEventListener('click', function (e) {
+    var b = e.target.closest('.pdel');
+    if (!b) return;
+    b.closest('.prow').remove();
+    refresh();
+  });
+  rows.addEventListener('input', refresh);
+  perKill.addEventListener('input', refresh);
+
+  // quick team type: suggests slots until the admin edits the slots box by hand
+  var dirty = false, defaults = { Solo: 48, Duo: 24, Squad: 12 };
+  slots.addEventListener('input', function () { dirty = true; refresh(); });
+  $('teamSeg').addEventListener('change', function (e) {
+    if (!dirty && defaults[e.target.value]) slots.value = defaults[e.target.value];
+    refresh();
+  });
+
+  refresh();
+})();
+</script>
+{% endblock %}

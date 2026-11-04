@@ -1,0 +1,110 @@
+{% extends "_layout.html" %}
+{% block title %}Withdrawals{% endblock %}
+{% block actions %}{% if items|selectattr('status', 'ne', 'pending')|list %}<button class="btn" type="button" id="clearAll">Clear all settled</button>{% endif %}{% endblock %}
+{% block content %}
+<style>
+.pill.pending{color:var(--gold);background:rgba(251,191,36,.15)}
+.pill.paid{color:var(--green);background:rgba(74,222,128,.15)}
+.pill.rejected{color:#fca5a5;background:rgba(239,68,68,.15)}
+.upi{display:flex;align-items:center;gap:8px;font-weight:600}
+.cp{height:28px;padding:0 10px;border-radius:8px;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2)}
+.sub{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.uidline{white-space:normal;word-break:break-all;max-width:190px}
+.acts2{display:flex;gap:8px}
+.hint2{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5}
+.shotlink{height:32px;padding:0 12px;font-size:12px}
+</style>
+
+{% if not items %}
+<section class="empty">
+  <div class="e-ico"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/></svg></div>
+  <b>No withdrawal requests yet</b>
+  <p>When a player withdraws their winnings, the request shows up here with their UPI ID.</p>
+</section>
+{% else %}
+<p class="hint2">Send the amount to the player's UPI ID from your own UPI app first, then click <b>Mark paid</b>. The player gets a "Withdrawal successful" notification. <b>Reject</b> puts the money back into the player's winnings. After a request is paid or rejected you can <b>Delete</b> it to keep this list clean. Each request can be settled only once.</p>
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Requested</th><th>Player</th><th>UPI ID</th><th>Amount</th><th>History</th><th>Status</th><th></th></tr>
+  {% for r in items %}
+  <tr data-id="{{ r.id }}" data-amt="{{ r.amount }}" data-name="{{ r.ign or 'Player' }}" data-upi="{{ r.upi }}">
+    <td>{{ r.when }}</td>
+    <td><b>{{ r.ign or 'Player' }}</b><span class="sub">Free Fire UID {{ r.game_uid or '—' }}</span><span class="sub uidline">Account ID {{ r.uid }}</span></td>
+    <td><span class="upi">{{ r.upi }}<button class="cp" type="button" data-copy="{{ r.upi }}">Copy</button></span>
+      {% if r.upi_shot %}<button class="btn shotlink qr" type="button" data-src="{{ url_for('upi_shot', wid=r.id) }}" style="margin-top:6px">Show QR</button>{% endif %}</td>
+    <td><b>₹{{ r.amount|inr }}</b></td>
+    <td>Won ₹{{ r.won|inr }}<span class="sub">Added ₹{{ r.added|inr }}</span></td>
+    <td><span class="pill {{ r.status }}">{{ r.status|capitalize }}</span>
+      {% if r.status == 'paid' %}<span class="sub">{{ r.done }}{{ ' • Ref ' ~ r.ref if r.ref }}</span>{% endif %}
+      {% if r.status == 'rejected' %}<span class="sub">{{ r.done }}{{ ' • ' ~ r.note if r.note }}</span>{% endif %}</td>
+    <td>
+      {% if r.status == 'pending' %}
+      <div class="acts2"><button class="btn primary paid" type="button">Mark paid</button><button class="btn rej" type="button">Reject</button></div>
+      {% else %}
+      <button class="btn del" type="button">Delete</button>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+
+<dialog id="qrDlg">
+  <h3 style="font-size:16px;margin-bottom:10px">UPI QR / screenshot</h3>
+  <img id="qrImg" alt="UPI QR" style="display:block;width:100%;max-height:60vh;object-fit:contain;border-radius:12px;background:#000">
+  <button class="btn wide" type="button" id="qrClose" style="margin-top:12px">Close</button>
+</dialog>
+<style>
+#qrDlg{margin:auto;width:min(420px,92vw);padding:20px;border-radius:18px;color:var(--text);background:var(--panel);border:1px solid var(--line)}
+#qrDlg::backdrop{background:rgba(0,0,0,.75)}
+</style>
+<script>
+(function () {
+  var busy = false, dlg = document.getElementById('qrDlg');
+  document.getElementById('qrClose').addEventListener('click', function () { dlg.close(); });
+  function send(url, body, msgFn) {
+    if (busy) return; busy = true;
+    window.api(url, body).then(function (res) {
+      busy = false;
+      if (!res.ok) { window.toast(res.error || 'Something went wrong.'); return; }
+      window.toast(msgFn(res));
+      setTimeout(function () { location.reload(); }, 3500);
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var q = e.target.closest('.qr');
+    if (q) { document.getElementById('qrImg').src = q.dataset.src; dlg.showModal(); return; }
+
+    var c = e.target.closest('.cp');
+    if (c) { navigator.clipboard.writeText(c.dataset.copy).then(function () { window.toast('UPI ID copied.'); }); return; }
+
+    if (e.target.closest('#clearAll')) {
+      if (!confirm('Delete every paid and rejected request from this list? Pending requests stay.')) return;
+      send('/withdrawals/clear', {}, function (res) { return 'Cleared ' + res.deleted + ' requests.'; });
+      return;
+    }
+
+    var row = e.target.closest('tr[data-id]'); if (!row) return;
+    var id = row.dataset.id, amt = Number(row.dataset.amt).toLocaleString('en-IN');
+    if (e.target.closest('.paid')) {
+      if (!confirm('Have you sent \u20B9' + amt + ' to ' + row.dataset.upi + '? This cannot be undone.')) return;
+      var ref = prompt('UPI reference number (optional, for your records):', '');
+      if (ref === null) return;
+      send('/withdrawals/' + id + '/paid', { ref: ref }, function (res) {
+        if (res.notified === 'sent') return 'Marked as paid. Player notified.';
+        if (res.notified === 'no_device') return 'Marked as paid. Player has notifications off.';
+        return 'Marked as paid. Notification failed: ' + (res.notify_error || 'unknown error');
+      });
+    } else if (e.target.closest('.rej')) {
+      var why = prompt('Reason for rejecting (the \u20B9' + amt + ' goes back to ' + row.dataset.name + '\'s winnings):', '');
+      if (why === null) return;
+      send('/withdrawals/' + id + '/reject', { reason: why }, function () { return 'Rejected. Money returned to winnings.'; });
+    } else if (e.target.closest('.del')) {
+      if (!confirm('Delete this request from the list? The player\'s wallet history is not affected.')) return;
+      send('/withdrawals/' + id + '/delete', {}, function () { return 'Deleted.'; });
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

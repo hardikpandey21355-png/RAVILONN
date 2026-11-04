@@ -1,0 +1,234 @@
+{% extends "_layout.html" %}
+{% block title %}Accounts{% endblock %}
+{% block content %}
+<style>
+.h3{font-size:14px;font-weight:600;margin:26px 0 10px}
+.w3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.wc{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:6px}
+.wc .t{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.wc .n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:11px;font-weight:700;background:rgba(255,255,255,.1);color:#fff}
+.wc b.big{font-size:32px;font-weight:700;line-height:1.1}
+.wc .ln{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted)}
+.wc .ln b{color:#fff;font-weight:600}
+.wc .why{font-size:11px;color:var(--muted);line-height:1.5;margin-top:4px;padding-top:8px;border-top:1px solid var(--line)}
+.wc.g{border-color:rgba(74,222,128,.45)} .wc.g b.big{color:var(--green)}
+.wc.o b.big{color:var(--gold)}
+.lootbox{margin-top:16px;border-radius:18px;padding:16px 18px;border:1px solid rgba(247,215,116,.55);
+  background:linear-gradient(180deg,rgba(247,215,116,.09),rgba(247,215,116,.02)),#0f0c05;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.lootbox .l small{display:block;font-size:12px;color:#c9b66f}
+.lootbox .l b{display:block;font-size:26px;color:#f7d774;margin-top:2px}
+.lootbox .r{font-size:12px;color:#c9b66f;line-height:1.6;max-width:360px}
+.heldbox{margin-top:12px;font-size:12px;color:var(--muted);padding:12px 16px;border-radius:14px;border:1px dashed var(--line);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.heldbox b{color:#fff}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;max-width:640px;display:grid;gap:8px}
+.ln2{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted)}
+.ln2 b{color:#fff;font-weight:600}
+.ln2.big{padding-top:8px;border-top:1px solid var(--line);color:#fff}
+.ln2.big b{font-size:16px}
+.ok{color:var(--green)} .bad{color:#fca5a5} .gold{color:var(--gold)}
+.msg{padding:11px 14px;border-radius:12px;font-size:13px;margin:14px 0;max-width:640px;line-height:1.5}
+.msg.ok{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.4)}
+.msg.bad{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4)}
+.msg.warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.4);color:var(--gold)}
+.row2{display:flex;gap:10px}
+.row2 .inp{flex:1}
+.sub{display:block;font-size:11px;color:var(--muted);margin-top:2px;white-space:normal}
+.pos{color:var(--green);font-weight:600} .neg{color:#fca5a5;font-weight:600}
+.lt{color:#f7d774;font-weight:600}
+.history-clear{margin:28px 0 18px;padding:18px;border:1px solid rgba(248,113,113,.45);border-radius:16px;
+  background:linear-gradient(180deg,rgba(248,113,113,.08),rgba(248,113,113,.02)),var(--panel)}
+.history-clear p{margin:0 0 12px;color:var(--muted);font-size:12px;line-height:1.55}
+.history-clear .btn{width:100%;min-height:58px;font-size:16px;font-weight:700;color:#fff;
+  background:#991b1b;border-color:#ef4444}
+.history-clear .btn:hover{background:#b91c1c}
+.history-clear .btn:disabled{opacity:.6;cursor:wait}
+</style>
+
+{% set s = summary %}
+
+<!-- 3 wallets -->
+<section class="w3">
+  <div class="wc">
+    <div class="t"><span class="n">1</span>Total received</div>
+    <b class="big">₹{{ s.deposits|inr }}</b>
+    <div class="ln"><span>Aaj aaya</span><b>₹{{ s.dep_today|inr }} ({{ s.dep_today_n }})</b></div>
+    <div class="ln"><span>− Withdrawals paid</span><b>₹{{ s.wd_paid|inr }}</b></div>
+    <div class="ln"><span>− Aapne nikaala</span><b>₹{{ s.taken|inr }}</b></div>
+    <div class="ln"><span>= Bank me hona chahiye</span><b>₹{{ s.received_left|inr }}</b></div>
+    <p class="why">Sirf real paisa jo players ne add kiya. Support credit aur loot ka paisa isme nahi aata.</p>
+  </div>
+
+  <div class="wc o">
+    <div class="t"><span class="n">2</span>Players ka paisa (dena hai)</div>
+    <b class="big">₹{{ s.owed|inr }}</b>
+    <div class="ln"><span>Deposited</span><b>₹{{ s.w_dep|inr }}</b></div>
+    <div class="ln"><span>Winnings</span><b>₹{{ s.w_win|inr }}</b></div>
+    {% if s.w_bon %}<div class="ln"><span>Bonus</span><b>₹{{ s.w_bon|inr }}</b></div>{% endif %}
+    <div class="ln"><span>Pending withdrawals ({{ s.wd_pend_n }})</span><b>₹{{ s.wd_pend|inr }}</b></div>
+    {% if s.due %}<div class="ln"><span>Sabse purani request</span><b>{% if s.due.late %}<span class="bad">{{ s.due.hours }}h {{ s.due.mins }}m late</span>{% else %}{{ s.due.hours }}h {{ s.due.mins }}m bacha{% endif %}</b></div>{% endif %}
+    <p class="why">Jab withdraw pay hoga to ye bhi kam hoga aur Total received bhi.</p>
+  </div>
+
+  <div class="wc g">
+    <div class="t"><span class="n">3</span>Secure wallet (hamari kamayi)</div>
+    <b class="big">₹{{ s.secure_net|inr }}</b>
+    <div class="ln"><span>Ended matches ka profit</span><b>₹{{ s.paid_profit|inr }}</b></div>
+    {% if s.support %}<div class="ln"><span>− Support credits</span><b>₹{{ s.support|inr }}</b></div>{% endif %}
+    <div class="ln"><span>− Aapne nikaala</span><b>₹{{ s.taken|inr }}</b></div>
+    <div class="ln"><span>− Loot ka kharcha</span><b class="lt">₹{{ s.loot_spend|inr }}</b></div>
+    <div class="ln"><span>Abhi nikaal sakte ho</span><b>₹{{ s.takeable|inr }}</b></div>
+    <p class="why">Profit match khatam hone ke baad hi badhta hai. Match chalte waqt fees neeche "held" me rehti hai.</p>
+  </div>
+</section>
+
+<!-- loot box -->
+<section class="lootbox">
+  <div class="l"><small>LOOT ka amount (free matches ke prizes)</small><b>₹{{ s.loot_spend|inr }}</b></div>
+  <div class="r">Loot me entry fee nahi hoti, to ye hamara promotion kharcha hai. Ye Secure se minus hota hai, par alag dikhaya hai taaki saaf pata chale. Isme se ₹{{ s.loot_paid|inr }} players ko pay ho chuka hai.</div>
+</section>
+
+<div class="heldbox">
+  <span>Running matches ki fees (abhi hamari nahi, match khatam hone par Secure me jayegi): <b>₹{{ s.held|inr }}</b></span>
+  {% if s.drafts %}<span>Draft prize (pay nahi hua): <b>₹{{ s.drafts|inr }}</b></span>{% endif %}
+</div>
+
+{% if s.result_left %}
+<p class="msg warn">{{ s.result_left }} ended match ka result abhi pura nahi diya gaya. Prize dene ke baad hisaab sahi ho jayega.</p>
+{% endif %}
+
+<!-- bank check -->
+<div class="h3">Bank check</div>
+<div class="box">
+  <div class="ln2"><span>Bank me hona chahiye (Wallet 1)</span><b>₹{{ s.received_left|inr }}</b></div>
+  <div class="ln2"><span>− Players ko dena hai (Wallet 2)</span><b>₹{{ s.owed|inr }}</b></div>
+  <div class="ln2 big"><span>Bank me hamara paisa</span><b class="{{ 'ok' if s.free_bank >= 0 else 'bad' }}">₹{{ s.free_bank|inr }}</b></div>
+</div>
+{% if s.free_bank < 0 %}
+<p class="msg bad">Players ko ₹{{ s.owed|inr }} dene hain par bank me sirf ₹{{ s.received_left|inr }} hona chahiye. ₹{{ (0 - s.free_bank)|inr }} kam hai (loot prizes aur support credits ka paisa real nahi aaya). Sab ek saath withdraw karein to dikkat hogi.</p>
+{% endif %}
+{% if s.mismatch == 0 %}
+<p class="msg ok">Hisaab match ho raha hai: Secure ₹{{ s.secure_net|inr }} + running fees ₹{{ s.held|inr }}{% if s.drafts %} + draft prize ₹{{ s.drafts|inr }}{% endif %} = ₹{{ s.free_bank|inr }}.</p>
+{% else %}
+<p class="msg bad">Hisaab me ₹{{ s.mismatch|inr }} ka farak hai. Kuch paisa books me nahi dikh raha. Common wajah: kisi ended match ko delete karna, ya test tools (+₹500 test winnings) use karna.</p>
+{% endif %}
+
+<!-- take money out -->
+<div class="h3">Secure wallet se paisa nikaalna</div>
+<div class="box">
+  <p style="font-size:12px;color:var(--muted);line-height:1.5">Bank se apni kamayi nikaalne ke baad yahan record karo. Sirf ₹{{ s.takeable|inr }} tak nikaal sakte ho (Secure aur bank ka free paisa, dono me se jo kam ho), taaki players ka paisa kabhi na chhue.</p>
+  <div class="row2">
+    <input class="inp" id="tkAmt" type="number" min="1" placeholder="Amount ₹" style="max-width:160px">
+    <input class="inp" id="tkNote" maxlength="80" placeholder="Note, jaise: UPI se nikaala" autocomplete="off">
+  </div>
+  <p class="err" id="tkErr"></p>
+  <button class="btn primary" type="button" id="tkGo">Record nikaala</button>
+</div>
+
+<!-- per match -->
+<div class="h3">Match-wise hisaab</div>
+{% if s.matches %}
+<div style="margin-bottom:12px"><button class="btn" type="button" id="clrMatches" style="border-color:rgba(239,68,68,.6);color:#fca5a5">Delete ended matches data</button></div>
+{% endif %}
+{% if not s.matches %}
+<p style="font-size:13px;color:var(--muted)">Abhi koi tournament nahi hai.</p>
+{% else %}
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Match</th><th>Start</th><th>Status</th><th>Players</th><th>Fees</th><th>Prize</th><th>Profit</th></tr>
+  {% for m in s.matches %}
+  <tr>
+    <td><b>{{ m.mode }}</b>{% if m.loot %} <span class="pill upcoming">LOOT</span>{% endif %}<span class="sub">{{ m.team }} • {{ m.map }}</span></td>
+    <td>{{ m.when }}</td>
+    <td><span class="pill {{ m.status }}">{{ m.status|capitalize }}</span></td>
+    <td>{{ m.players }}</td>
+    <td>₹{{ m.fees|inr }}</td>
+    <td>{% if m.status == 'completed' %}₹{{ m.payout|inr }}{% if m.result_left %}<span class="sub gold">Result baaki: {{ m.result_left }} player</span>{% endif %}{% else %}—{% endif %}</td>
+    <td>{% if m.profit is none %}<span class="sub">₹{{ m.held|inr }} held</span>
+      {% elif m.loot %}<span class="lt">Loot kharcha ₹{{ m.payout|inr }}</span>
+      {% else %}<span class="{{ 'pos' if m.profit >= 0 else 'neg' }}">{{ '+' if m.profit > 0 else '' }}₹{{ m.profit|inr }}</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+
+<section class="history-clear">
+  <div class="h3" style="margin:0 0 8px;color:#fca5a5">Clear all Accounts history + zero wallets</div>
+  <p>Deposit history, “Aapne kitna nikaala” ki list delete hogi aur <b>saare players ke wallet balances ₹0</b> ho jayenge. Totals same rahenge; accounts aur match data nahi mitenge. Pending withdrawals cancel nahi honge. Ye undo nahi ho sakta.</p>
+  <button class="btn" type="button" id="clrAccountHistory">Delete all Accounts history &amp; zero wallets</button>
+</section>
+
+<div class="h3">Deposit history</div>
+{% if not deposits %}
+<p style="font-size:13px;color:var(--muted)">Abhi kisi ne paisa add nahi kiya.</p>
+{% else %}
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Time</th><th>Player</th><th>Amount</th><th>Kaise</th></tr>
+  {% for d in deposits %}
+  <tr>
+    <td>{{ d.when }}</td>
+    <td><b>{{ d.ign or 'Player' }}</b><span class="sub">Free Fire UID {{ d.game_uid or '—' }}</span></td>
+    <td class="{{ 'gold' if d.support else 'pos' }}">+₹{{ d.amt|inr }}</td>
+    <td>{{ d.how }}{% if d.support %}<span class="sub">Hamara kharcha, bank me paisa nahi aaya</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+
+<div class="h3">Aapne kitna nikaala</div>
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Time</th><th>Amount</th><th>Note</th></tr>
+  {% for p in payouts %}
+  <tr><td>{{ p.when }}</td><td><b>₹{{ p.amount|inr }}</b></td><td style="white-space:normal">{{ p.note }}</td></tr>
+  {% endfor %}
+  {% if not payouts %}<tr><td colspan="3" style="color:var(--muted)">Abhi kuch nahi nikaala.</td></tr>{% endif %}
+</table>
+</div>
+
+<script>
+(function () {
+  var busy = false, $ = function (i) { return document.getElementById(i); };
+  $('tkGo').addEventListener('click', function () {
+    if (busy) return;
+    var a = parseInt($('tkAmt').value, 10), note = $('tkNote').value.trim();
+    $('tkErr').textContent = '';
+    if (!a || a < 1) { $('tkErr').textContent = 'Amount daalo.'; return; }
+    if (note.length < 3) { $('tkErr').textContent = 'Chhota sa note likho.'; return; }
+    if (!confirm('\u20B9' + a.toLocaleString('en-IN') + ' nikaala record karna hai? Ye undo nahi hoga.')) return;
+    busy = true;
+    window.api('/accounts/take', { amount: String(a), note: note }).then(function (r) {
+      busy = false;
+      if (!r.ok) { $('tkErr').textContent = r.error || 'Kuch galat hua.'; return; }
+      window.toast('Record ho gaya.'); setTimeout(function () { location.reload(); }, 800);
+    });
+  });
+  function clear(id, url, ask, success) {
+    var b = $(id); if (!b) return;
+    b.addEventListener('click', function () {
+      if (busy || !confirm(ask)) return;
+      busy = true;
+      window.api(url, {}).then(function (r) {
+        busy = false;
+        if (!r.ok) { window.toast(r.error || 'Kuch galat hua.'); return; }
+        window.toast(success ? success(r) : r.deleted + ' records delete hue.');
+        setTimeout(function () { location.reload(); }, 800);
+      });
+    });
+  }
+  clear('clrAccountHistory', '/accounts/clear-history',
+    'Deposit history + nikaala list delete hogi aur SAB players ke wallet balances ₹0 ho jayenge. Totals same rahenge. Ye undo nahi hoga. Pakka?',
+    function (r) { return r.deleted + ' records delete hue, ' + r.wallets + ' wallets zero hue.'; });
+  clear('clrMatches', '/accounts/clear-matches',
+    'Saare ENDED matches (unke players/results ke saath) permanently delete honge. Profit aur loot ka hisaab totals me save rahega. Ye undo nahi hoga. Pakka?',
+    function (r) {
+      var msg = r.deleted + ' matches delete hue' + (r.skipped ? ', ' + r.skipped + ' skip (result baaki hai)' : '') + '.';
+      return r.warnings && r.warnings.length ? msg + ' ' + r.warnings.join(' ') : msg;
+    });
+  // numbers update on their own every 30 seconds
+  setInterval(function () { if (!busy && !document.hidden && document.activeElement.tagName !== 'INPUT') location.reload(); }, 30000);
+})();
+</script>
+{% endblock %}

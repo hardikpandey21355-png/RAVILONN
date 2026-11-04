@@ -1,0 +1,33 @@
+{% extends "_layout.html" %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+<style>
+.preview{position:relative;min-height:320px;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:22px}
+.preview-content{filter:blur(7px);opacity:.48;pointer-events:none;user-select:none}
+.preview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.preview-card{height:94px;border:1px solid var(--line);border-radius:14px;background:var(--panel2);padding:14px}
+.preview-line{height:10px;width:62%;margin-bottom:13px;border-radius:8px;background:#555775}
+.preview-line:last-child{width:38%;opacity:.55}
+.preview-row{height:56px;margin-top:12px;border-radius:12px;background:var(--panel2)}
+.notice{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:12px;padding:24px;text-align:center;background:rgba(7,7,15,.3)}
+.notice-badge{border:1px solid rgba(251,191,36,.28);border-radius:999px;background:rgba(251,191,36,.1);padding:7px 12px;color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.04em}
+.notice h2{font-size:20px}
+.notice p{max-width:460px;color:var(--muted);font-size:13px;line-height:1.6}
+@media(max-width:600px){.preview-grid{grid-template-columns:1fr}.preview{min-height:380px}.preview-card:nth-child(n+2){display:none}}
+</style>
+<section class="preview" aria-label="Feature under development">
+  <div class="preview-content" aria-hidden="true">
+    <div class="preview-grid">
+      <div class="preview-card"><div class="preview-line"></div><div class="preview-line"></div></div>
+      <div class="preview-card"><div class="preview-line"></div><div class="preview-line"></div></div>
+      <div class="preview-card"><div class="preview-line"></div><div class="preview-line"></div></div>
+    </div>
+    <div class="preview-row"></div><div class="preview-row"></div>
+  </div>
+  <div class="notice">
+    <span class="notice-badge">TO BE COMPLETED</span>
+    <h2>{{ heading }}</h2>
+    <p>{{ message }}</p>
+  </div>
+</section>
+{% endblock %}

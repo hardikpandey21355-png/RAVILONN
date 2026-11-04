@@ -1,0 +1,234 @@
+{% extends "_layout.html" %}
+{% block title %}Check and edit{% endblock %}
+{% block content %}
+<style>
+.panel{max-width:900px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:18px}
+.panel h3{font-size:15px;margin-bottom:10px}
+.hint2{font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:14px}
+.row2{display:flex;gap:10px}
+.row2 .inp{flex:1}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.who{margin-top:14px;padding:12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)}
+.who b{display:block;font-size:15px}
+.who small,.sub{display:block;font-size:12px;color:var(--muted);margin-top:4px;overflow-wrap:anywhere}
+.identity-list{display:grid;gap:8px;margin:14px 0}
+.identity-item{display:grid;grid-template-columns:minmax(120px,180px) minmax(0,1fr);gap:12px;align-items:start;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.035)}
+.identity-label{color:var(--muted);font-size:11px}
+.identity-value{display:block;min-width:0;max-width:100%;font-size:13px;font-weight:600;line-height:1.5;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-all!important}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.stat{min-width:0;max-width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.035)}
+.stat small{display:block;min-width:0;max-width:100%;color:var(--muted);font-size:11px;overflow-wrap:anywhere;word-break:break-word}
+.stat b{display:block;min-width:0;max-width:100%;font-size:15px;line-height:1.4;margin-top:5px;overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+.boxform{display:grid;gap:12px;max-width:560px}
+.boxform label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px}
+.table-title{margin:18px 0 10px}
+.err{color:#ff9292;font-size:12px;min-height:16px}
+.empty{color:var(--muted);padding:16px;text-align:center}
+.details-table{table-layout:fixed}
+.details-table th,.details-table td{overflow-wrap:anywhere;word-break:break-word}
+select.inp option{background:#13132a}
+@media(max-width:640px){.stats{grid-template-columns:minmax(0,1fr)}.identity-item{grid-template-columns:minmax(0,1fr);gap:4px}}
+@media(max-width:520px){.row2{flex-direction:column}.panel{padding:14px}}
+</style>
+
+<section class="panel">
+  <h3>Find a player</h3>
+  <p class="hint2">Search by the player's account UID or Free Fire UID. You can view account and wallet details, or record a balance deduction. Every deduction is added to the wallet ledger and audit log, and the player is notified.</p>
+  <div class="row2">
+    <input class="inp" id="ceQuery" autocomplete="off" placeholder="Enter account UID or Free Fire UID">
+    <button class="btn primary" type="button" id="ceFind">Search player</button>
+  </div>
+  <p class="err" id="ceErr" role="alert"></p>
+  <div class="who" id="cePlayer" hidden>
+    <b id="ceName"></b>
+    <small id="ceUid"></small>
+    <small id="ceBalance"></small>
+  </div>
+  <div class="actions" id="ceActions" hidden>
+    <button class="btn" type="button" id="ceView">View full details</button>
+    <button class="btn" type="button" id="ceEdit">Edit amount</button>
+  </div>
+</section>
+
+<section class="panel" id="ceDetails" hidden>
+  <h3>Player details</h3>
+  <div class="identity-list" id="ceIdentity"></div>
+  <div class="stats" id="ceStats"></div>
+  <div class="tbl-wrap">
+    <table class="tbl details-table">
+      <thead><tr><th>Date (IST)</th><th>Transaction</th><th>Amount</th><th>Direction</th><th>Status</th><th>Reference</th></tr></thead>
+      <tbody id="ceTransactions"></tbody>
+    </table>
+    <div class="empty" id="ceNoTransactions" hidden>No transactions found.</div>
+  </div>
+</section>
+
+<section class="panel" id="ceEditForm" hidden>
+  <h3>Deduct from wallet</h3>
+  <p class="hint2">Only deduct an amount after review. The selected balance cannot go below zero. This change is permanent and creates an immutable ledger entry.</p>
+  <div class="boxform">
+    <label>Deduct from
+      <select class="inp" id="ceBucket">
+        <option value="deposited">Deposited amount</option>
+        <option value="winnings">Winnings</option>
+      </select>
+    </label>
+    <label>Amount to deduct (₹)
+      <input class="inp" id="ceAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="Whole rupees">
+    </label>
+    <label>Reason (admin record only)
+      <input class="inp" id="ceReason" maxlength="120" autocomplete="off" placeholder="Reason for the suspicious-amount review">
+    </label>
+    <button class="btn primary wide" type="button" id="ceSubmit">Deduct and notify player</button>
+  </div>
+</section>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var found = null, busy = false;
+  var fmt = function (value) { return Number(value || 0).toLocaleString('en-IN'); };
+  var hideResults = function () {
+    $('cePlayer').hidden = true;
+    $('ceActions').hidden = true;
+    $('ceDetails').hidden = true;
+    $('ceEditForm').hidden = true;
+  };
+  var showError = function (message) { $('ceErr').textContent = message || ''; };
+
+  $('ceFind').addEventListener('click', function () {
+    if (busy) return;
+    var query = $('ceQuery').value.trim();
+    showError('');
+    found = null;
+    hideResults();
+    if (!query) { showError('Enter an account UID or Free Fire UID.'); return; }
+    busy = true;
+    $('ceFind').disabled = true;
+    window.api('/check-edit/find', { query: query }).then(function (response) {
+      busy = false;
+      $('ceFind').disabled = false;
+      if (!response.ok) { showError(response.error || 'Could not find the player.'); return; }
+      found = response;
+      $('ceName').textContent = response.name || response.ign || 'Player';
+      $('ceUid').textContent = 'Account UID: ' + response.uid +
+        ' · Free Fire UID: ' + (response.game_uid || '—');
+      $('ceBalance').textContent = 'Total ₹' + fmt(response.total) +
+        ' · Deposited ₹' + fmt(response.deposited) +
+        ' · Winnings ₹' + fmt(response.winnings) +
+        ' · Bonus ₹' + fmt(response.bonus);
+      $('cePlayer').hidden = false;
+      $('ceActions').hidden = false;
+    });
+  });
+
+  $('ceView').addEventListener('click', function () {
+    if (!found || busy) return;
+    busy = true;
+    showError('');
+    $('ceView').disabled = true;
+    window.api('/check-edit/details', { uid: found.uid }).then(function (response) {
+      busy = false;
+      $('ceView').disabled = false;
+      if (!response.ok) { showError(response.error || 'Could not load player details.'); return; }
+      var stats = response.stats || {}, wallet = response.wallet || {};
+      $('ceIdentity').replaceChildren();
+      var identity = [
+        ['Name', response.name || 'Player'],
+        ['Email', response.email || '—'],
+        ['Account UID', response.uid],
+        ['Free Fire UID', response.game_uid || '—']
+      ];
+      identity.forEach(function (item) {
+        var row = document.createElement('div'), label = document.createElement('span'), value = document.createElement('span');
+        row.className = 'identity-item';
+        label.className = 'identity-label';
+        value.className = 'identity-value';
+        label.textContent = item[0];
+        value.textContent = item[1];
+        row.append(label, value);
+        $('ceIdentity').appendChild(row);
+      });
+      $('ceStats').replaceChildren();
+      var values = [
+        ['Deposited', '₹' + fmt(wallet.deposited)],
+        ['Winnings balance', '₹' + fmt(wallet.winnings)],
+        ['Total wallet', '₹' + fmt(wallet.total)],
+        ['Games played', fmt(stats.matches)],
+        ['Wins', fmt(stats.wins)],
+        ['Total kills', fmt(stats.kills)],
+        ['Total winnings earned', '₹' + fmt(stats.earned)],
+        ['Account status', response.held ? 'On hold' : 'Active']
+      ];
+      values.forEach(function (item) {
+        var card = document.createElement('div'), label = document.createElement('small'), value = document.createElement('b');
+        card.className = 'stat';
+        label.textContent = item[0];
+        value.textContent = item[1];
+        card.append(label, value);
+        $('ceStats').appendChild(card);
+      });
+      var table = $('ceTransactions');
+      table.replaceChildren();
+      var history = response.transactions || [];
+      history.forEach(function (item) {
+        var row = document.createElement('tr');
+        [item.date, item.title || item.kind, '₹' + fmt(item.amount),
+          item.direction, item.status, item.reference || '—'].forEach(function (text) {
+          var cell = document.createElement('td');
+          cell.textContent = text || '—';
+          row.appendChild(cell);
+        });
+        table.appendChild(row);
+      });
+      $('ceNoTransactions').hidden = history.length !== 0;
+      $('ceDetails').hidden = false;
+      $('ceEditForm').hidden = true;
+    });
+  });
+
+  $('ceEdit').addEventListener('click', function () {
+    if (!found) return;
+    $('ceDetails').hidden = true;
+    $('ceEditForm').hidden = false;
+    var balance = $('ceBucket').value === 'deposited' ? found.deposited : found.winnings;
+    $('ceAmount').max = String(balance);
+  });
+  $('ceBucket').addEventListener('change', function () {
+    if (!found) return;
+    $('ceAmount').max = String(this.value === 'deposited' ? found.deposited : found.winnings);
+  });
+
+  $('ceSubmit').addEventListener('click', function () {
+    if (!found || busy) return;
+    var amount = Number($('ceAmount').value), reason = $('ceReason').value.trim();
+    var bucket = $('ceBucket').value;
+    var max = bucket === 'deposited' ? found.deposited : found.winnings;
+    showError('');
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > max) {
+      showError('Enter a whole-rupee amount within the selected balance.');
+      return;
+    }
+    if (reason.length < 3) { showError('Enter a short reason for the audit record.'); return; }
+    if (!confirm('Deduct ₹' + fmt(amount) + ' from this player’s ' + bucket +
+      ' balance and notify them? This cannot be undone.')) return;
+    busy = true;
+    this.disabled = true;
+    var button = this;
+    window.api('/check-edit/deduct', {
+      uid: found.uid, amount: String(amount), bucket: bucket, reason: reason
+    }).then(function (response) {
+      busy = false;
+      button.disabled = false;
+      if (!response.ok) { showError(response.error || 'Could not update the wallet.'); return; }
+      window.toast(response.notified === 'sent' ? 'Deduction saved. Player notified.'
+        : response.notified === 'no_device' ? 'Deduction saved. Player has no push device.'
+        : 'Deduction saved. Push notification could not be sent.');
+      $('ceAmount').value = '';
+      $('ceReason').value = '';
+      setTimeout(function () { $('ceFind').click(); }, 1200);
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "_layout.html" %}
+{% block title %}Maintenance{% endblock %}
+{% block content %}
+<style>
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px;max-width:560px}
+.box label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+.hint2{font-size:12px;color:var(--muted);line-height:1.5;max-width:560px;margin-bottom:14px}
+.state{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
+.state b{font-size:15px;display:block}
+.state small{font-size:12px;color:var(--muted)}
+.state.on{border-color:rgba(251,191,36,.6);background:rgba(251,191,36,.08)}
+.state.on b{color:var(--gold)}
+.sw{width:54px;height:30px;border-radius:999px;background:rgba(255,255,255,.18);position:relative;flex:none;transition:.2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s}
+.sw[aria-checked=true]{background:var(--gold)}
+.sw[aria-checked=true]::after{transform:translateX(24px)}
+</style>
+
+<p class="hint2">Maintenance ON karte hi <b>saare players</b> ko "Under maintenance" page dikhega aur wo kuch use nahi kar payenge. Login, join, wallet sab band. Gateway payments jo pehle ho chuke hain wo phir bhi wallet me credit honge. Policy pages khule rahenge. OFF karte hi app turant normal ho jayega.</p>
+
+<div class="box">
+  <div class="state {{ 'on' if m.on }}" id="state">
+    <div><b id="stTitle">{{ 'Maintenance is ON' if m.on else 'App is live' }}</b>
+      <small id="stSub">{{ 'Players ko maintenance page dikh raha hai.' if m.on else 'Sab players normal use kar sakte hain.' }}</small></div>
+    <button type="button" class="sw" id="sw" role="switch" aria-checked="{{ 'true' if m.on else 'false' }}" aria-label="Maintenance mode"></button>
+  </div>
+
+  <label>Message jo players ko dikhega
+    <input class="inp" id="msg" maxlength="200" autocomplete="off" value="{{ m.message }}"></label>
+  <label>Kab tak (optional, jaise: Back in 30 minutes / Back by 6:00 PM)
+    <input class="inp" id="eta" maxlength="40" autocomplete="off" value="{{ m.eta }}"></label>
+  <p class="err" id="err"></p>
+  <button class="btn primary wide" type="button" id="save">Save</button>
+</div>
+
+<script>
+(function () {
+  var $ = function (i) { return document.getElementById(i); }, busy = false;
+  function paint() {
+    var on = $('sw').getAttribute('aria-checked') === 'true';
+    $('state').classList.toggle('on', on);
+    $('stTitle').textContent = on ? 'Maintenance is ON' : 'App is live';
+    $('stSub').textContent = on ? 'Players ko maintenance page dikh raha hai.' : 'Sab players normal use kar sakte hain.';
+  }
+  $('sw').addEventListener('click', function () {
+    this.setAttribute('aria-checked', this.getAttribute('aria-checked') !== 'true'); paint();
+  });
+  $('save').addEventListener('click', function () {
+    if (busy) return;
+    var on = $('sw').getAttribute('aria-checked') === 'true';
+    if (on && !confirm('Maintenance ON karna hai? Saare players app use nahi kar payenge.')) return;
+    busy = true; this.disabled = true; $('err').textContent = '';
+    var btn = this;
+    window.api('/maintenance/save', { on: on, message: $('msg').value, eta: $('eta').value }).then(function (r) {
+      busy = false; btn.disabled = false;
+      if (!r.ok) { $('err').textContent = r.error || 'Kuch galat hua.'; return; }
+      window.toast(on ? 'Maintenance ON. Players ko page dikh raha hai.' : 'Saved. App live hai.');
+    });
+  });
+})();
+</script>
+{% endblock %}

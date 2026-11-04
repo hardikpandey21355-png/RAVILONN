@@ -1,0 +1,131 @@
+{% extends "_layout.html" %}
+{% block title %}Tournaments{% endblock %}
+{% block actions %}<a class="btn primary" href="{{ url_for('tournament_new') }}">+ Create tournament</a>{% endblock %}
+{% block content %}
+{% if error %}<p class="err">{{ error }}</p>{% endif %}
+{% if not items %}
+<section class="empty">
+  <div class="e-ico"><svg class="i" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/></svg></div>
+  <b>No tournaments yet</b>
+  <p>Create a tournament. It appears in the player app on its own.</p>
+  <a class="btn primary" href="{{ url_for('tournament_new') }}">+ Create tournament</a>
+</section>
+{% else %}
+<style>
+.tgl{display:flex;gap:10px;max-width:420px;margin-bottom:16px}
+.tgl button{flex:1;height:46px;border-radius:12px;font-size:14px;font-weight:600;color:#fff;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);transition:.15s}
+.tgl button span{font-weight:500;color:var(--muted);margin-left:4px}
+.tgl button.on{background:var(--btn);border-color:rgba(255,255,255,.35);box-shadow:0 0 14px rgba(168,85,247,.45)}
+.tgl button.on span{color:#fff}
+.norows{padding:22px;text-align:center;font-size:13px;color:var(--muted)}
+</style>
+<div class="tgl" id="tgl">
+  <button type="button" data-k="0">Normal<span>({{ items|rejectattr('loot')|list|length }})</span></button>
+  <button type="button" data-k="1">Loot<span>({{ items|selectattr('loot')|list|length }})</span></button>
+</div>
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Name</th><th>Team • Map</th><th>Prize</th><th>Fee</th><th>Players</th><th>Start</th><th>Status</th><th></th></tr>
+  {% for t in items %}
+  <tr data-loot="{{ 1 if t.loot else 0 }}">
+    <td><a href="{{ url_for('tournament_players', tid=t.id) }}" title="See joined players"><b style="text-decoration:underline;text-underline-offset:3px">{{ t.mode }}</b></a>{% if t.loot %} <span class="pill upcoming">LOOT</span>{% endif %}</td>
+    <td>{{ t.team }} • {{ t.map }}</td>
+    <td>₹{{ t.prize }}</td>
+    <td>₹{{ t.fee }}</td>
+    <td>{{ t.joined }} / {{ t.slots }}</td>
+    <td>{{ t.when if t.status == 'upcoming' else '' }}{{ ' (' ~ t.duration_min ~ ' min)' if t.status == 'live' }}</td>
+    <td><span class="pill {{ t.status }}">{{ t.status|capitalize }}</span></td>
+    <td style="display:flex;gap:8px">
+      {% if t.status != 'completed' %}
+      <button class="btn room-btn" type="button" data-id="{{ t.id }}" data-name="{{ t.mode }}"
+              data-room="{{ t.room_id }}" data-pass="{{ t.room_pass }}">{{ 'Room ✓' if t.room_id else 'Add room' }}</button>
+      {% endif %}
+      {% if t.status == 'completed' %}
+      <a class="btn primary" href="{{ url_for('tournament_result', tid=t.id) }}">Results</a>
+      {% endif %}
+      <form method="post" action="{{ url_for('tournament_delete', tid=t.id) }}" onsubmit="return confirm('Delete this tournament?')">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="btn" type="submit">Delete</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="norows" id="noRows" hidden></p>
+</div>
+<dialog id="roomDlg">
+  <h3 id="rdTitle" style="font-size:16px"></h3>
+  <p style="font-size:12px;color:var(--muted);margin:4px 0 14px">Players who joined see these right away. You can change them any time until the match ends. Leave both empty to remove.</p>
+  <input class="inp" id="rdId" placeholder="Room ID" maxlength="20" autocomplete="off" style="margin-bottom:10px">
+  <input class="inp" id="rdPass" placeholder="Password" maxlength="20" autocomplete="off">
+  <p class="err" id="rdErr"></p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <button class="btn" type="button" id="rdCancel">Cancel</button>
+    <button class="btn primary" type="button" id="rdSave">Save</button>
+  </div>
+</dialog>
+<style>
+#roomDlg{margin:auto;width:min(380px,92vw);padding:22px;border-radius:18px;color:var(--text);background:var(--panel);border:1px solid var(--line)}
+#roomDlg::backdrop{background:rgba(0,0,0,.7)}
+</style>
+<script>
+(function () {
+  var $ = function (i) { return document.getElementById(i); };
+  var dlg = $('roomDlg'), cur = null, busy = false;
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.room-btn'); if (!b) return;
+    cur = b.dataset.id;
+    $('rdTitle').textContent = 'Room details • ' + b.dataset.name;
+    $('rdId').value = b.dataset.room; $('rdPass').value = b.dataset.pass; $('rdErr').textContent = '';
+    dlg.showModal(); $('rdId').focus();
+  });
+  $('rdCancel').addEventListener('click', function () { dlg.close(); });
+  $('rdSave').addEventListener('click', function () {
+    if (busy) return; busy = true;
+    window.api('/tournaments/' + encodeURIComponent(cur) + '/room', { room_id: $('rdId').value, room_pass: $('rdPass').value })
+      .then(function (res) {
+        busy = false;
+        if (!res.ok) { $('rdErr').textContent = res.error || 'Could not save.'; return; }
+                        var n = res.notified;
+        dlg.close();
+        window.toast('Room details saved.' + (n
+          ? ' Notified ' + n.sent + ', no notifications: ' + n.no_device + ', failed: ' + n.failed + '.'
+          : (res.notify_error ? ' Not notified: ' + res.notify_error : '')));
+        setTimeout(function () { location.reload(); }, 2200);
+      });
+  });
+})();
+</script>
+
+<script>
+(function () {
+  var rows = [].slice.call(document.querySelectorAll('.tbl tr[data-loot]'));
+  var btns = [].slice.call(document.querySelectorAll('#tgl button'));
+  var none = document.getElementById('noRows');
+  var cur = '0';   // default: normal tournaments
+  try { cur = sessionStorage.getItem('tKind') || '0'; } catch (e) {}
+
+  function apply() {
+    var n = 0;
+    rows.forEach(function (r) {
+      var ok = r.dataset.loot === cur;
+      r.hidden = !ok;
+      if (ok) n++;
+    });
+    btns.forEach(function (b) { b.classList.toggle('on', b.dataset.k === cur); });
+    none.hidden = n > 0;
+    none.textContent = cur === '1' ? 'Koi loot tournament nahi hai.' : 'Koi normal tournament nahi hai.';
+  }
+
+  document.getElementById('tgl').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    cur = b.dataset.k;
+    try { sessionStorage.setItem('tKind', cur); } catch (x) {}
+    apply();
+  });
+  apply();
+})();
+</script>
+{% endif %}
+{% endblock %}

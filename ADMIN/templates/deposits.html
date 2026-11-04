@@ -1,0 +1,140 @@
+{% extends "_layout.html" %}
+{% block title %}Approve amount{% endblock %}
+{% block actions %}{% if items %}<button class="btn" type="button" id="clrSettled">Delete settled</button>{% endif %}{% endblock %}
+{% block content %}
+<style>
+.pill.pending{color:var(--gold);background:rgba(251,191,36,.15)}
+.pill.approved{color:var(--green);background:rgba(74,222,128,.15)}
+.pill.rejected{color:#fca5a5;background:rgba(239,68,68,.15)}
+.sub{display:block;font-size:11px;color:var(--muted);margin-top:2px;white-space:normal}
+.utr{display:flex;align-items:center;gap:8px;font-weight:600;font-family:ui-monospace,Consolas,monospace}
+.cp{height:28px;padding:0 10px;border-radius:8px;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2)}
+.acts2{display:flex;gap:8px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:18px;max-width:760px}
+.box h3{font-size:14px;margin-bottom:6px}
+.box p{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px}
+.up{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.up input[type=file]{flex:1;min-width:220px;color:var(--muted);font-size:13px}
+.res{margin-top:12px;padding:11px 14px;border-radius:12px;font-size:13px;line-height:1.5;border:1px solid rgba(74,222,128,.4);background:rgba(74,222,128,.1);color:var(--green)}
+.res.warn{color:var(--gold);border-color:rgba(251,191,36,.4);background:rgba(251,191,36,.1)}
+</style>
+
+<div class="box">
+  <h3>Match a bank statement</h3>
+  <p>Upload your bank or PhonePe statement (<b>CSV or Excel</b>). Every pending request whose UTR / transaction ID is in the statement <b>with the same credited amount</b> is approved and the player's wallet is topped up. Requests that do not match are <b>not rejected</b>: they stay pending with a note, so you can recheck them. You can upload a newer statement any time.</p>
+  <div class="up">
+    <input type="file" id="stmt" accept=".csv,.xlsx">
+    <button class="btn primary" type="button" id="stmtGo">Match and approve</button>
+  </div>
+  <div class="res" id="stmtRes" hidden></div>
+</div>
+
+{% if not items %}
+<section class="empty">
+  <div class="e-ico"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg></div>
+  <b>No requests yet</b>
+  <p>When a player adds money by UPI and sends the UTR, the request shows up here.</p>
+</section>
+{% else %}
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Requested</th><th>Player</th><th>Amount</th><th>UTR / Transaction ID</th><th>Status</th><th></th></tr>
+  {% for r in items %}
+  <tr data-id="{{ r.id }}" data-amt="{{ r.amount }}" data-name="{{ r.ign or 'Player' }}" data-utr="{{ r.utr }}">
+    <td>{{ r.when }}</td>
+    <td><b>{{ r.ign or 'Player' }}</b><span class="sub">Free Fire UID {{ r.game_uid or '—' }}</span></td>
+    <td><b>₹{{ r.amount|inr }}</b></td>
+    <td><span class="utr">{{ r.utr }}<button class="cp" type="button" data-copy="{{ r.utr }}">Copy</button></span></td>
+    <td><span class="pill {{ r.status }}">{{ r.status|capitalize }}</span>
+      {% if r.status == 'pending' and r.note %}<span class="sub">{{ r.note }}</span>{% endif %}
+      {% if r.status == 'approved' %}<span class="sub">{{ r.done }} • {{ 'Statement match' if r.method == 'statement' else 'Approved by hand' }}</span>{% endif %}
+      {% if r.status == 'rejected' %}<span class="sub">{{ r.done }}{{ ' • ' ~ r.note if r.note }}</span>{% endif %}</td>
+    <td>
+      {% if r.status == 'pending' %}
+      <div class="acts2"><button class="btn primary ap" type="button">Approve</button><button class="btn rj" type="button">Reject</button></div>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% if items|selectattr('status', 'eq', 'pending')|list %}
+<div style="margin-top:16px;display:flex;justify-content:flex-end">
+  <button class="btn" type="button" id="rejAll" style="border-color:rgba(239,68,68,.6);color:#fca5a5">Reject all pending</button>
+</div>
+{% endif %}
+{% endif %}
+
+<script>
+(function () {
+  var csrf = (document.querySelector('meta[name="csrf"]') || {}).content || '';
+  var busy = false, res = document.getElementById('stmtRes');
+
+  var clearButton = document.getElementById('clrSettled');
+  if (clearButton) clearButton.addEventListener('click', function () {
+    if (busy || !confirm('Saari approved aur rejected requests delete karni hain? Pending requests rahengi. Ye undo nahi hoga.')) return;
+    busy = true;
+    window.api('/deposits/clear', {}).then(function (r) {
+      busy = false;
+      if (!r.ok) { window.toast(r.error || 'Something went wrong.'); return; }
+      window.toast(r.deleted + ' settled requests delete hue.');
+      setTimeout(function () { location.reload(); }, 800);
+    });
+  });
+
+  document.getElementById('stmtGo').addEventListener('click', function () {
+    var f = document.getElementById('stmt').files[0];
+    if (!f) { window.toast('Choose the statement file first.'); return; }
+    if (busy) return; busy = true; this.disabled = true;
+    var btn = this, fd = new FormData(); fd.append('file', f); fd.append('csrf', csrf);
+    fetch('/deposits/statement', { method: 'POST', headers: { 'X-CSRF': csrf }, body: fd })
+      .then(function (r) { return r.json(); })
+      .catch(function () { return { ok: false, error: 'Network problem. Try again.' }; })
+      .then(function (d) {
+        busy = false; btn.disabled = false;
+        if (!d.ok) { window.toast(d.error || 'Something went wrong.'); return; }
+        res.hidden = false;
+        res.className = 'res' + (d.review ? ' warn' : '');
+        res.textContent = d.checked === 0 ? 'There are no pending requests to check.'
+          : 'Checked ' + d.checked + ' pending: ' + d.approved + ' approved automatically, ' + d.review + ' left for you to recheck.' +
+            (d.credit_column ? '' : ' (No credit column found in the file, so the amount was matched against any column. Double check the approved ones.)');
+        if (d.approved || d.review) setTimeout(function () { location.reload(); }, 2500);
+      });
+  });
+
+  document.addEventListener('click', function (e) {
+    var c = e.target.closest('.cp');
+    if (c) { navigator.clipboard.writeText(c.dataset.copy).then(function () { window.toast('Copied.'); }); return; }
+    if (e.target.closest('#rejAll')) {
+      if (busy) return;
+      if (!confirm('Reject EVERY pending request and send each player a fraud warning?\n\nUpload your latest bank statement first, so real payments are not rejected by mistake. This cannot be undone.')) return;
+      busy = true;
+      window.api('/deposits/reject-all', {}).then(function (r) {
+        busy = false;
+        if (!r.ok) { window.toast(r.error || 'Something went wrong.'); return; }
+        window.toast('Rejected ' + r.rejected + ' requests. Players warned.'); setTimeout(function () { location.reload(); }, 1500);
+      });
+      return;
+    }
+    var row = e.target.closest('tr[data-id]'); if (!row || busy) return;
+    var id = row.dataset.id, amt = Number(row.dataset.amt).toLocaleString('en-IN');
+    function done(url, body, msg) {
+      busy = true;
+      window.api(url, body).then(function (r) {
+        busy = false;
+        if (!r.ok) { window.toast(r.error || 'Something went wrong.'); return; }
+        window.toast(msg); setTimeout(function () { location.reload(); }, 1200);
+      });
+    }
+    if (e.target.closest('.ap')) {
+      if (!confirm('Did \u20B9' + amt + ' with UTR ' + row.dataset.utr + ' reach your bank account? It will be added to ' + row.dataset.name + '\'s wallet. This cannot be undone.')) return;
+      done('/deposits/' + id + '/approve', {}, 'Approved. Wallet topped up.');
+    } else if (e.target.closest('.rj')) {
+      var why = prompt('Reason for rejecting (the player sees it and gets a fraud warning):', 'Payment not received');
+      if (why === null) return;
+      done('/deposits/' + id + '/reject', { reason: why }, 'Rejected.');
+    }
+  });
+})();
+</script>
+{% endblock %}

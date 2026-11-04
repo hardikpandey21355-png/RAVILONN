@@ -1,0 +1,96 @@
+{% extends "_layout.html" %}
+{% block title %}Account holds{% endblock %}
+{% block content %}
+<style>
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:18px;display:grid;gap:10px;max-width:560px}
+.box h3{font-size:14px}
+.box label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+.hint2{font-size:12px;color:var(--muted);line-height:1.5}
+.row2{display:flex;gap:10px}
+.row2 .inp{flex:1}
+.who{padding:12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)}
+.who b{font-size:15px;display:block}
+.who small{display:block;font-size:12px;color:var(--muted);margin-top:3px}
+.sub{display:block;font-size:11px;color:var(--muted);margin-top:2px;white-space:normal}
+.danger{border-color:rgba(239,68,68,.6);color:#fca5a5}
+</style>
+
+<div class="box">
+  <h3>Put an account on hold</h3>
+  <p class="hint2">The player sees a "your account is on hold" popup when they open the app, and cannot join matches, add money or withdraw until you release the account.</p>
+  <label>Free Fire UID (or account ID) of the player
+    <div class="row2"><input class="inp" id="hQuery" autocomplete="off" placeholder="e.g. 1234567890">
+    <button class="btn" type="button" id="hFind">Find player</button></div></label>
+  <p class="err" id="hErr"></p>
+  <div class="who" id="hPlayer" hidden><b id="hName"></b><small id="hUid"></small></div>
+  <div id="hForm" style="display:none;gap:10px">
+    <label>Reason (only for your record, the player does not see it)
+      <input class="inp" id="hReason" maxlength="80" autocomplete="off" placeholder="e.g. Fake payment requests again and again"></label>
+    <button class="btn wide danger" type="button" id="hAdd">Put on hold</button>
+  </div>
+</div>
+
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Since</th><th>Player</th><th>Reason</th><th></th></tr>
+  {% for r in items %}
+  <tr data-uid="{{ r.uid }}">
+    <td>{{ r.when }}</td>
+    <td><b>{{ r.ign or 'Player' }}</b><span class="sub">Free Fire UID {{ r.game_uid or '—' }}</span></td>
+    <td style="white-space:normal">{{ r.reason }}</td>
+    <td><button class="btn rel" type="button">Release</button></td>
+  </tr>
+  {% endfor %}
+  {% if not items %}<tr><td colspan="4" style="color:var(--muted)">No account is on hold.</td></tr>{% endif %}
+</table>
+</div>
+
+<script>
+(function () {
+  var $ = function (i) { return document.getElementById(i); };
+  var found = null, busy = false;
+
+  $('hFind').addEventListener('click', function () {
+    if (busy) return;
+    var q = $('hQuery').value.trim();
+    $('hErr').textContent = ''; found = null; $('hPlayer').hidden = true; $('hForm').style.display = 'none';
+    if (!q) { $('hErr').textContent = 'Enter the Free Fire UID first.'; return; }
+    busy = true;
+    window.api('/holds/find', { query: q }).then(function (r) {
+      busy = false;
+      if (!r.ok) { $('hErr').textContent = r.error || 'Could not find the player.'; return; }
+      found = r;
+      $('hName').textContent = (r.ign || 'Player') + (r.held ? '  (already on hold)' : '');
+      $('hUid').textContent = 'Free Fire UID ' + (r.game_uid || '—');
+      $('hPlayer').hidden = false;
+      if (!r.held) $('hForm').style.display = 'grid';
+    });
+  });
+
+  $('hAdd').addEventListener('click', function () {
+    if (busy || !found) return;
+    var why = $('hReason').value.trim();
+    $('hErr').textContent = '';
+    if (why.length < 3) { $('hErr').textContent = 'Write a short reason for your record.'; return; }
+    if (!confirm('Put ' + (found.ign || 'this player') + ' on hold? They cannot use the app until you release them.')) return;
+    busy = true;
+    window.api('/holds/add', { query: found.uid, reason: why }).then(function (r) {
+      busy = false;
+      if (!r.ok) { $('hErr').textContent = r.error || 'Something went wrong.'; return; }
+      window.toast('Account is on hold.'); setTimeout(function () { location.reload(); }, 1000);
+    });
+  });
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.rel'); if (!b || busy) return;
+    if (!confirm('Release this account? The player can use the app again.')) return;
+    busy = true;
+    window.api('/holds/release', { uid: b.closest('tr').dataset.uid }).then(function (r) {
+      busy = false;
+      if (!r.ok) { window.toast(r.error || 'Could not release this account.'); return; }
+      window.toast('Released.'); setTimeout(function () { location.reload(); }, 800);
+    });
+  });
+})();
+</script>
+{% endblock %}

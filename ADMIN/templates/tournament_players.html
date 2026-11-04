@@ -1,0 +1,44 @@
+{% extends "_layout.html" %}
+{% block title %}Joined players{% endblock %}
+{% block actions %}<a class="btn" href="{{ url_for('tournaments') }}">Back</a>{% endblock %}
+{% block content %}
+{% set t = c.t %}
+<style>
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.sum .card b{font-size:20px}
+.cp{height:28px;padding:0 10px;border-radius:8px;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2)}
+.uidc{display:flex;align-items:center;gap:8px;font-weight:600;font-family:ui-monospace,Consolas,monospace}
+</style>
+
+<div class="sum">
+  <div class="card"><small>Match</small><b>{{ t.mode }}</b></div>
+  <div class="card"><small>{{ t.team }} • {{ t.map }}</small><b>{{ t.joined }} / {{ t.slots }}</b></div>
+</div>
+
+{% if not c.rows %}
+<section class="empty">
+  <b>No player has joined yet</b>
+  <p>Players who join this match will show up here.</p>
+</section>
+{% else %}
+<div class="tbl-wrap">
+<table class="tbl">
+  <tr><th>Slot</th><th>Player name</th><th>Free Fire UID</th></tr>
+  {% for r in c.rows %}
+  <tr>
+    <td><b>{{ r.slot if r.slot else '—' }}</b></td>
+    <td><b>{{ r.ign or 'Player' }}</b></td>
+    <td>{% if r.game_uid %}<span class="uidc">{{ r.game_uid }}<button class="cp" type="button" data-copy="{{ r.game_uid }}">Copy</button></span>{% else %}—{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('click', function (e) {
+  var c = e.target.closest('.cp'); if (!c) return;
+  navigator.clipboard.writeText(c.dataset.copy).then(function () { window.toast('UID copied.'); });
+});
+</script>
+{% endblock %}
