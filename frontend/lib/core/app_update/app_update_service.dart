@@ -4,7 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../auth/api_client.dart';
 import '../auth/auth_session.dart';
 
-const int currentAppBuildNumber = 2;
+const int currentAppBuildNumber = 3;
 
 class AppUpdateService {
   AppUpdateService({ApiClient? apiClient})
@@ -38,7 +38,25 @@ class AppUpdateService {
           builder: (context) => AlertDialog(
             title: const Text('₹10 bonus added'),
             content: const Text(
-              'Your one-time app update bonus is now in your bonus balance.',
+              'Your one-time app update bonus is now in your deposit balance.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+      } else if (_integer(response['migratedToDeposit']) > 0 &&
+          context.mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Bonus moved to deposit balance'),
+            content: Text(
+              '₹${_integer(response['migratedToDeposit'])} from your existing '
+              'update bonus is now in your deposit balance.',
             ),
             actions: [
               TextButton(

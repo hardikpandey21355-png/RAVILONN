@@ -32,8 +32,8 @@ class AppUpdateApiTests(unittest.TestCase):
         settings = {
             "maintenance": False,
             "appUpdateEnabled": True,
-            "appLatestVersionCode": 3,
-            "appLatestVersionName": "1.2.0",
+            "appLatestVersionCode": 2,
+            "appLatestVersionName": "1.1.0",
             "appDownloadUrl": "https://example.com/Ravilon.apk",
             "appUpdateMessage": "An update is available.",
         }
@@ -54,7 +54,7 @@ class AppUpdateApiTests(unittest.TestCase):
                 "ok": True,
                 "enabled": True,
                 "latestBuildNumber": 3,
-                "latestVersionName": "1.2.0",
+                "latestVersionName": "1.1.0",
                 "downloadUrl": "https://example.com/Ravilon.apk",
                 "message": "An update is available.",
             },
@@ -70,12 +70,16 @@ class AppUpdateApiTests(unittest.TestCase):
             patch("app.routes._require_user", return_value=({}, None)),
             patch("app.routes.get_settings", return_value=settings),
             patch("app.services.settings_service.get_settings", return_value=settings),
+            patch(
+                "app.routes.migrate_app_update_bonus_to_deposit",
+                return_value=0,
+            ) as migrate,
             patch("app.routes.claim_app_update_bonus", return_value=True) as claim,
             patch(
                 "app.routes.wallet_for",
                 return_value={
-                    "deposited": 0,
-                    "bonus": 10,
+                    "deposited": 10,
+                    "bonus": 0,
                     "winnings": 0,
                     "total": 10,
                 },
@@ -89,7 +93,9 @@ class AppUpdateApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["amount"], 10)
-        self.assertEqual(response.json["wallet"]["bonus"], 10)
+        self.assertEqual(response.json["wallet"]["deposited"], 10)
+        self.assertEqual(response.json["migratedToDeposit"], 0)
+        migrate.assert_called_once_with("player-1", campaign_build_number=2)
         claim.assert_called_once_with(
             "player-1",
             2,

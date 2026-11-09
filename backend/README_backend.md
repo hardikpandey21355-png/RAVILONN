@@ -53,8 +53,10 @@ The authenticated `GET /api/app-update` endpoint provides the latest Android
 version and download URL. Builds that include the update checker show an
 optional Update / Skip prompt only when the configured version code is newer.
 The authenticated `POST /api/app-update/claim` endpoint grants the one-time
-₹10 bonus to the bonus wallet bucket for eligible builds. A Firestore
-transaction prevents an account from claiming the same campaign twice.
+₹10 bonus to the deposited wallet bucket for eligible builds. A Firestore
+transaction prevents an account from claiming the same campaign twice. For the
+original campaign, existing claims that were credited to the bonus bucket are
+transferred to the deposited bucket up to the remaining bonus balance.
 
 These settings are read from `settings/app` and fall back to the defaults in
 `settings_service.py`:

@@ -155,7 +155,7 @@ def claim_app_update_bonus(
         apply(
             uid,
             {
-                "deltas": {"bonus": 10},
+                "deltas": {"deposited": 10},
                 "kind": "app_update_bonus",
                 "title": "APK update bonus",
                 "amt": 10,
@@ -169,10 +169,68 @@ def claim_app_update_bonus(
             claim_ref,
             {
                 "buildNumber": campaign_build_number,
+                "creditBucket": "deposited",
                 "createdAt": firestore.SERVER_TIMESTAMP,
             },
         )
         return True
+
+    return run_transaction(database, operation)
+
+
+def migrate_app_update_bonus_to_deposit(
+    uid: str,
+    *,
+    campaign_build_number: int,
+    db: Any = None,
+) -> int:
+    database = db or get_db()
+    claim_ref = (
+        database.collection("users")
+        .document(uid)
+        .collection("appUpdateRewards")
+        .document(f"build_{campaign_build_number}")
+    )
+
+    def operation(tx: Any) -> int:
+        claim_snapshot = claim_ref.get(transaction=tx)
+        if not claim_snapshot.exists:
+            return 0
+        claim = claim_snapshot.to_dict() or {}
+        if claim.get("creditBucket") == "deposited" or claim.get(
+            "depositMigratedAt"
+        ):
+            return 0
+
+        _ensure_not_held(database, uid, tx)
+        wallet_ref = database.collection("wallets").document(uid)
+        wallet_snapshot = wallet_ref.get(transaction=tx)
+        wallet = wallet_snapshot.to_dict() if wallet_snapshot.exists else {}
+        bonus_balance = _rupees(wallet.get("bonus", 0), "bonus")
+        amount = min(10, bonus_balance)
+        if amount:
+            apply(
+                uid,
+                {
+                    "deltas": {"bonus": -amount, "deposited": amount},
+                    "kind": "app_update_bonus_transfer",
+                    "title": "APK update bonus moved to deposit",
+                    "amt": amount,
+                    "dir": "in",
+                    "status": "paid",
+                    "ref": f"apk-update-build-{campaign_build_number}",
+                },
+                tx,
+            )
+        tx.update(
+            claim_ref,
+            {
+                "creditBucket": "deposited",
+                "depositMigrationAmount": amount,
+                "depositMigratedAt": firestore.SERVER_TIMESTAMP,
+            },
+        )
+        return amount
 
     return run_transaction(database, operation)
 

@@ -16,6 +16,7 @@ from app.core.auth import (
 )
 from app.core.firestore import get_db, get_storage_bucket, run_transaction
 from app.services.settings_service import (
+    LATEST_APP_BUILD_NUMBER,
     get_add_money_method,
     get_settings,
     maintenance_info,
@@ -43,6 +44,7 @@ from app.services.wallet_service import (
     InsufficientFunds,
     apply,
     claim_app_update_bonus,
+    migrate_app_update_bonus_to_deposit,
     wallet_for,
 )
 
@@ -204,7 +206,9 @@ def app_update_info() -> tuple[Any, int]:
     settings = get_settings()
     version_code = settings["appLatestVersionCode"]
     if isinstance(version_code, bool) or not isinstance(version_code, int):
-        version_code = 2
+        version_code = LATEST_APP_BUILD_NUMBER
+    else:
+        version_code = max(version_code, LATEST_APP_BUILD_NUMBER)
     version_name = settings["appLatestVersionName"]
     if not isinstance(version_name, str):
         version_name = "1.1.0"
@@ -248,6 +252,10 @@ def claim_app_update_reward() -> tuple[Any, int]:
     if isinstance(campaign_build, bool) or not isinstance(campaign_build, int):
         campaign_build = 2
     try:
+        migrated_to_deposit = migrate_app_update_bonus_to_deposit(
+            g.uid,
+            campaign_build_number=campaign_build,
+        )
         credited = claim_app_update_bonus(
             g.uid,
             build_number,
@@ -262,6 +270,7 @@ def claim_app_update_reward() -> tuple[Any, int]:
             "ok": True,
             "credited": credited,
             "amount": 10 if credited else 0,
+            "migratedToDeposit": migrated_to_deposit,
             "wallet": wallet_for(g.uid),
         }
     ), 200
