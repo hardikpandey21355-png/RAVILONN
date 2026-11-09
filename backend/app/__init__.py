@@ -20,6 +20,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         FIREBASE_PROJECT_ID=os.environ.get(
             "FIREBASE_PROJECT_ID", DEFAULT_FIREBASE_PROJECT_ID
         ),
+        FIREBASE_SERVICE_ACCOUNT_JSON=os.environ.get(
+            "FIREBASE_SERVICE_ACCOUNT_JSON", ""
+        ),
         FIREBASE_CREDENTIALS=os.environ.get("FIREBASE_CREDENTIALS", ""),
         STORAGE_BUCKET=os.environ.get("STORAGE_BUCKET", ""),
         TRANZUPI_API_KEY=os.environ.get("TRANZUPI_API_KEY", ""),
