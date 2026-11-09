@@ -638,6 +638,85 @@ class AdminTournamentUiTests(unittest.TestCase):
         self.assertEqual(response.json["notified"], counts)
         save.assert_called_once_with("tournament-1", "room-1", "pass-1")
 
+    def test_remove_data_page_explains_deletion_scope(self) -> None:
+        response = self.client.get("/remove-data")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Remove data", response.data)
+        self.assertIn(b"Search users", response.data)
+        self.assertIn(b"Payment/transaction history and tournament entries/results are retained", response.data)
+        self.assertIn(b"Pending withdrawals", response.data)
+
+    def test_remove_data_search_returns_matching_accounts(self) -> None:
+        matches = [
+            {
+                "uid": "player-1",
+                "name": "ShadowX",
+                "email": "player@example.com",
+                "ign": "ShadowX",
+                "game_uid": "1234567890",
+                "total": 25,
+            }
+        ]
+        with patch.object(
+            admin_app,
+            "search_players_for_removal",
+            return_value=matches,
+        ) as search:
+            response = self.client.post(
+                "/remove-data/search",
+                json={"query": "player@example.com"},
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["matches"], matches)
+        search.assert_called_once_with("player@example.com")
+
+    def test_remove_data_requires_exact_uid_confirmation(self) -> None:
+        with patch.object(
+            admin_app,
+            "remove_player_identity",
+            return_value={
+                "uid": "player-1",
+                "authAccountDeleted": True,
+            },
+        ) as remove:
+            response = self.client.post(
+                "/remove-data/delete",
+                json={"uid": "player-1", "confirmation": "player-1"},
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json["authAccountDeleted"])
+        remove.assert_called_once_with(
+            "player-1",
+            "player-1",
+            admin_uid="local-admin",
+            storage_bucket=None,
+        )
+
+    def test_remove_data_surfaces_pending_withdrawal_block(self) -> None:
+        with (
+            patch.object(admin_app, "get_storage_bucket", return_value=None),
+            patch.object(
+                admin_app,
+                "remove_player_identity",
+                side_effect=admin_app.AdminOperationError(
+                    "Settle or reject pending withdrawals before removing this account."
+                ),
+            ),
+        ):
+            response = self.client.post(
+                "/remove-data/delete",
+                json={"uid": "player-1", "confirmation": "player-1"},
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("pending withdrawals", response.json["error"])
+
     def _csrf(self) -> str:
         with self.client.session_transaction() as session:
             return session["csrf"]

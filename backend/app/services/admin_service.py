@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
+import re
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from firebase_admin import auth as firebase_auth
 from firebase_admin import firestore
 
 from app.core.firestore import get_db, run_transaction
@@ -16,6 +18,7 @@ from app.services.wallet_service import InsufficientFunds, apply, wallet_for
 
 
 IST = ZoneInfo("Asia/Kolkata")
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class AdminOperationError(ValueError):
@@ -24,6 +27,205 @@ class AdminOperationError(ValueError):
 
 class PlayerNotFound(AdminOperationError):
     pass
+
+
+def search_players_for_removal(query: str, db: Any = None) -> list[dict[str, Any]]:
+    database = db or get_db()
+    query = " ".join(query.split())
+    if not query or len(query) > 128 or "/" in query:
+        raise AdminOperationError("Enter a valid email, account UID, or game name.")
+
+    needle = query.casefold()
+    candidates: dict[str, dict[str, Any]] = {}
+    users = database.collection("users")
+    for snapshot in users.stream():
+        user = snapshot.to_dict() or {}
+        identity_fields = (
+            snapshot.id,
+            user.get("email"),
+            user.get("name"),
+            user.get("ign"),
+            user.get("gameUid"),
+        )
+        if any(
+            isinstance(value, str) and needle in value.casefold()
+            for value in identity_fields
+        ):
+            candidates[snapshot.id] = _removal_candidate(
+                snapshot.id,
+                user,
+                database,
+            )
+
+    if query.isdigit() and 8 <= len(query) <= 12:
+        claim = database.collection("gameUids").document(query).get()
+        if claim.exists:
+            uid = (claim.to_dict() or {}).get("uid")
+            if isinstance(uid, str) and uid and uid not in candidates:
+                snapshot = users.document(uid).get()
+                if snapshot.exists:
+                    candidates[uid] = _removal_candidate(
+                        uid,
+                        snapshot.to_dict() or {},
+                        database,
+                    )
+
+    auth_user = None
+    try:
+        if EMAIL_PATTERN.fullmatch(query):
+            auth_user = firebase_auth.get_user_by_email(query)
+        elif "@" not in query and not candidates:
+            auth_user = firebase_auth.get_user(query)
+    except firebase_auth.UserNotFoundError:
+        auth_user = None
+
+    if auth_user is not None and auth_user.uid not in candidates:
+        profile = users.document(auth_user.uid).get()
+        candidates[auth_user.uid] = _removal_candidate(
+            auth_user.uid,
+            profile.to_dict() if profile.exists else {},
+            database,
+            auth_user=auth_user,
+        )
+
+    return sorted(
+        candidates.values(),
+        key=lambda item: (
+            item["name"].casefold(),
+            item["uid"],
+        ),
+    )[:25]
+
+
+def remove_player_identity(
+    uid: str,
+    confirmed_uid: str,
+    *,
+    admin_uid: str = "local-admin",
+    db: Any = None,
+    storage_bucket: Any = None,
+) -> dict[str, Any]:
+    if not isinstance(uid, str) or not uid or "/" in uid or len(uid) > 128:
+        raise AdminOperationError("Choose a valid player account.")
+    if not isinstance(confirmed_uid, str) or confirmed_uid != uid:
+        raise AdminOperationError("Type the player's account UID exactly to confirm.")
+
+    database = db or get_db()
+    user_ref = database.collection("users").document(uid)
+    user_snapshot = user_ref.get()
+    user = user_snapshot.to_dict() if user_snapshot.exists else {}
+    user = user or {}
+
+    auth_user = None
+    try:
+        auth_user = firebase_auth.get_user(uid)
+    except firebase_auth.UserNotFoundError:
+        pass
+    if not user_snapshot.exists and auth_user is None:
+        raise PlayerNotFound("Player account was not found.")
+    if auth_user is not None and (auth_user.custom_claims or {}).get("admin") is True:
+        raise AdminOperationError("Admin accounts cannot be removed here.")
+
+    pending_withdrawals = [
+        snapshot
+        for snapshot in database.collection("withdrawals")
+        .where("uid", "==", uid)
+        .stream()
+        if (snapshot.to_dict() or {}).get("status") == "pending"
+    ]
+    if pending_withdrawals:
+        raise AdminOperationError(
+            "Settle or reject pending withdrawals before removing this account."
+        )
+
+    if storage_bucket is None and user.get("upiShot") is True:
+        raise AdminOperationError(
+            "Configure the Firebase Storage bucket before removing this account's UPI screenshot."
+        )
+    screenshot = (
+        storage_bucket.blob(f"users/{uid}/upi.jpg")
+        if storage_bucket is not None and user.get("upiShot") is True
+        else None
+    )
+    has_screenshot = screenshot.exists() if screenshot is not None else False
+
+    if has_screenshot:
+        screenshot.delete()
+    if auth_user is not None:
+        firebase_auth.delete_user(uid)
+
+    game_uid_refs = [
+        snapshot.reference
+        for snapshot in database.collection("gameUids")
+        .where("uid", "==", uid)
+        .stream()
+    ]
+
+    notification_refs = [
+        snapshot.reference
+        for snapshot in database.collection("notifications")
+        .where("uid", "==", uid)
+        .stream()
+    ]
+    admin_notification_refs = [
+        snapshot.reference
+        for snapshot in database.collection("adminNotificationLogs")
+        .where("uid", "==", uid)
+        .stream()
+    ]
+    reward_refs = [
+        snapshot.reference
+        for snapshot in user_ref.collection("appUpdateRewards").stream()
+    ]
+    removal_refs = [
+        *notification_refs,
+        *admin_notification_refs,
+        *reward_refs,
+        database.collection("wallets").document(uid),
+        database.collection("withdrawalLocks").document(uid),
+    ]
+    removal_refs.extend(game_uid_refs)
+
+    audit_ref = database.collection("auditLogs").document()
+    for offset in range(0, len(removal_refs), 450):
+        batch = database.batch()
+        for reference in removal_refs[offset : offset + 450]:
+            batch.delete(reference)
+        batch.commit()
+
+    final_batch = database.batch()
+    if user_snapshot.exists:
+        final_batch.delete(user_ref)
+    final_batch.set(
+        audit_ref,
+        {
+            "uid": uid,
+            "adminUid": admin_uid,
+            "action": "player_identity_removed",
+            "details": {
+                "authAccountDeleted": auth_user is not None,
+                "profileDeleted": user_snapshot.exists,
+                "gameUidReleased": bool(game_uid_refs),
+                "walletDeleted": True,
+                "notificationsDeleted": len(notification_refs),
+                "adminNotificationLogsDeleted": len(admin_notification_refs),
+                "updateRewardClaimsDeleted": len(reward_refs),
+                "upiScreenshotDeleted": has_screenshot,
+                "financialAndTournamentHistoryRetained": True,
+            },
+            "createdAt": firestore.SERVER_TIMESTAMP,
+        },
+    )
+    final_batch.commit()
+
+    return {
+        "uid": uid,
+        "authAccountDeleted": auth_user is not None,
+        "profileDeleted": user_snapshot.exists,
+        "gameUidReleased": bool(game_uid_refs),
+        "walletDeleted": True,
+        "financialAndTournamentHistoryRetained": True,
+    }
 
 
 def find_player(query: str, db: Any = None) -> dict[str, Any]:
@@ -995,6 +1197,46 @@ def _player_data(
         "winnings": wallet["winnings"],
         "bonus": wallet["bonus"],
     }
+
+
+def _removal_candidate(
+    uid: str,
+    user: dict[str, Any],
+    database: Any,
+    *,
+    auth_user: Any = None,
+) -> dict[str, Any]:
+    wallet = wallet_for(uid, database)
+    name = _first_text(
+        user.get("name"),
+        getattr(auth_user, "display_name", ""),
+        user.get("ign"),
+    )
+    email = _first_text(user.get("email"), getattr(auth_user, "email", ""))
+    ign = _first_text(user.get("ign"))
+    return {
+        "uid": uid,
+        "name": name or "Player",
+        "email": email,
+        "ign": ign,
+        "game_uid": _first_text(user.get("gameUid")),
+        "profile_exists": bool(user),
+        "deposited": wallet["deposited"],
+        "bonus": wallet["bonus"],
+        "winnings": wallet["winnings"],
+        "total": wallet["total"],
+    }
+
+
+def _first_text(*values: Any) -> str:
+    return next(
+        (
+            value.strip()
+            for value in values
+            if isinstance(value, str) and value.strip()
+        ),
+        "",
+    )
 
 
 def _format_time(value: Any) -> str:

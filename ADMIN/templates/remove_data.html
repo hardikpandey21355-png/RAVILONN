@@ -1,0 +1,187 @@
+{% extends "_layout.html" %}
+{% block title %}Remove data{% endblock %}
+{% block content %}
+<style>
+.panel{max-width:980px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:18px}
+.panel h2{font-size:16px;margin-bottom:8px}
+.hint{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 14px}
+.search-row{display:flex;gap:10px}
+.search-row .inp{flex:1}
+.error{min-height:18px;margin-top:8px;color:#ff9292;font-size:12px}
+.matches{display:grid;gap:10px;margin-top:14px}
+.match{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.035)}
+.match b,.match small{display:block;overflow-wrap:anywhere}
+.match small{color:var(--muted);font-size:11px;margin-top:3px}
+.warning{padding:14px;border:1px solid rgba(248,113,113,.38);border-radius:12px;background:rgba(248,113,113,.08);color:#ffd0d0;font-size:12px;line-height:1.65}
+.selected{margin-top:16px}
+.identity{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.identity div{padding:11px;border:1px solid var(--line);border-radius:10px;min-width:0}
+.identity small,.identity b{display:block;overflow-wrap:anywhere}
+.identity small{font-size:10px;color:var(--muted)}
+.identity b{font-size:13px;margin-top:4px}
+.confirm{max-width:560px;margin-top:14px}
+.confirm label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.confirm .inp{margin-bottom:10px}
+.success{color:#86efac;font-size:13px;margin-top:12px}
+@media(max-width:600px){.panel{padding:15px}.search-row,.match{grid-template-columns:1fr;display:grid}.identity{grid-template-columns:1fr}}
+</style>
+
+<section class="panel">
+  <h2>Find a user account</h2>
+  <p class="hint">Search by email, account UID, Free Fire UID, or player/game name. Review the matching profile carefully before selecting an account.</p>
+  <div class="search-row">
+    <input class="inp" id="removeQuery" autocomplete="off" placeholder="Email, account UID, Free Fire UID, or game name">
+    <button class="btn primary" type="button" id="removeSearch">Search users</button>
+  </div>
+  <p class="error" id="removeError" role="alert"></p>
+  <div class="matches" id="removeMatches"></div>
+</section>
+
+<section class="panel" id="removeSelected" hidden>
+  <h2>Confirm account removal</h2>
+  <div class="identity" id="removeIdentity"></div>
+  <div class="warning">
+    This permanently deletes the Firebase Auth account, user profile, wallet, notifications, and linked Free Fire UID claim. The user can sign up again and claim that Free Fire UID.
+    <br><br>
+    Payment/transaction history and tournament entries/results are retained for audit. Existing tournament slots are not freed. Pending withdrawals must be settled or rejected first. Any remaining wallet balance is permanently removed.
+  </div>
+  <div class="confirm">
+    <label for="removeConfirmation">Type the account UID exactly to confirm</label>
+    <input class="inp" id="removeConfirmation" autocomplete="off" spellcheck="false" placeholder="Account UID">
+    <button class="btn primary wide" type="button" id="removeSubmit">Permanently remove account data</button>
+  </div>
+  <p class="error" id="removeConfirmError" role="alert"></p>
+  <p class="success" id="removeSuccess" role="status"></p>
+</section>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var matches = [], selected = null, busy = false;
+  var fmt = function (value) { return Number(value || 0).toLocaleString('en-IN'); };
+  var showError = function (message) { $('removeError').textContent = message || ''; };
+
+  function renderMatches(items) {
+    var container = $('removeMatches');
+    container.replaceChildren();
+    matches = items;
+    if (!items.length) {
+      var empty = document.createElement('p');
+      empty.className = 'hint';
+      empty.textContent = 'No matching users found.';
+      container.appendChild(empty);
+      return;
+    }
+    items.forEach(function (item, index) {
+      var row = document.createElement('div');
+      var info = document.createElement('div');
+      var name = document.createElement('b');
+      var email = document.createElement('small');
+      var ids = document.createElement('small');
+      var button = document.createElement('button');
+      row.className = 'match';
+      name.textContent = item.name || item.ign || 'Player';
+      email.textContent = item.email || 'No email in profile';
+      ids.textContent = 'Account UID: ' + item.uid + ' · Game name: ' +
+        (item.ign || '—') + ' · Free Fire UID: ' + (item.game_uid || '—');
+      button.type = 'button';
+      button.className = 'btn';
+      button.textContent = 'Review account';
+      button.addEventListener('click', function () { selectAccount(index); });
+      info.append(name, email, ids);
+      row.append(info, button);
+      container.appendChild(row);
+    });
+  }
+
+  function selectAccount(index) {
+    selected = matches[index];
+    $('removeConfirmError').textContent = '';
+    $('removeSuccess').textContent = '';
+    $('removeConfirmation').value = '';
+    var fields = [
+      ['Name', selected.name || 'Player'],
+      ['Email', selected.email || '—'],
+      ['Account UID', selected.uid],
+      ['Game name', selected.ign || '—'],
+      ['Free Fire UID', selected.game_uid || '—'],
+      ['Wallet that will be removed', '₹' + fmt(selected.total) +
+        ' (deposit ₹' + fmt(selected.deposited) + ', bonus ₹' +
+        fmt(selected.bonus) + ', winnings ₹' + fmt(selected.winnings) + ')']
+    ];
+    var container = $('removeIdentity');
+    container.replaceChildren();
+    fields.forEach(function (field) {
+      var cell = document.createElement('div');
+      var label = document.createElement('small');
+      var value = document.createElement('b');
+      label.textContent = field[0];
+      value.textContent = field[1];
+      cell.append(label, value);
+      container.appendChild(cell);
+    });
+    $('removeSelected').hidden = false;
+    $('removeConfirmation').focus();
+    $('removeSelected').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  $('removeSearch').addEventListener('click', function () {
+    if (busy) return;
+    selected = null;
+    $('removeSelected').hidden = true;
+    $('removeMatches').replaceChildren();
+    showError('');
+    var query = $('removeQuery').value.trim();
+    if (!query) { showError('Enter an email, UID, or game name.'); return; }
+    busy = true;
+    this.disabled = true;
+    var button = this;
+    window.api('/remove-data/search', { query: query }).then(function (response) {
+      busy = false;
+      button.disabled = false;
+      if (!response.ok) { showError(response.error || 'Search failed.'); return; }
+      renderMatches(response.matches || []);
+    });
+  });
+
+  $('removeQuery').addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') $('removeSearch').click();
+  });
+
+  $('removeSubmit').addEventListener('click', function () {
+    if (busy || !selected) return;
+    var confirmation = $('removeConfirmation').value;
+    $('removeConfirmError').textContent = '';
+    $('removeSuccess').textContent = '';
+    if (confirmation !== selected.uid) {
+      $('removeConfirmError').textContent = 'The UID must match exactly.';
+      return;
+    }
+    if (!window.confirm(
+      'Permanently remove the Auth account, profile, wallet, and linked game UID? ' +
+      'This cannot be undone. Financial and tournament history will remain.'
+    )) return;
+    busy = true;
+    this.disabled = true;
+    var button = this;
+    window.api('/remove-data/delete', {
+      uid: selected.uid,
+      confirmation: confirmation
+    }).then(function (response) {
+      busy = false;
+      button.disabled = false;
+      if (!response.ok) {
+        $('removeConfirmError').textContent = response.error || 'Could not remove this account.';
+        return;
+      }
+      $('removeSuccess').textContent =
+        'Account removed. Payment and tournament history remain for audit.';
+      $('removeSelected').hidden = true;
+      $('removeQuery').value = '';
+      $('removeMatches').replaceChildren();
+      selected = null;
+    });
+  });
+})();
+</script>
+{% endblock %}

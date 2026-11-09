@@ -202,6 +202,14 @@ from deposited or winnings balances. Deductions are whole-rupee Firestore
 transactions with an immutable wallet-ledger entry, an `auditLogs` record, and
 a player notification; a deduction cannot make a balance negative.
 
+The Admin **Remove data** page searches by email, account UID, Free Fire UID, or
+player name. Permanent removal deletes the Firebase Auth account, user profile,
+wallet, linked game-UID claim, notifications, and UPI screenshot. It retains
+payment/transaction and tournament history for audit, so existing tournament
+slots are not freed. Pending withdrawals must be settled or rejected first;
+remaining wallet balances are permanently removed. Admin custom-claim accounts
+cannot be removed through this page.
+
 ## Tests
 
 ```powershell

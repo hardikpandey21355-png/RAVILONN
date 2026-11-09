@@ -30,6 +30,8 @@ from app.services.admin_service import (
     deduct_wallet,
     delete_settled_withdrawal,
     find_player,
+    remove_player_identity,
+    search_players_for_removal,
     get_maintenance,
     list_holds,
     list_wallet_credits,
@@ -325,6 +327,42 @@ def notify():
 @app.get("/check-edit")
 def check_edit():
     return render_page("check_edit.html", "check_edit")
+
+
+@app.get("/remove-data")
+def remove_data():
+    return render_page("remove_data.html", "remove_data")
+
+
+@app.post("/remove-data/search")
+def remove_data_search():
+    body, error = _admin_json_body()
+    if error:
+        return error
+    try:
+        matches = search_players_for_removal(_string_field(body, "query"))
+    except AdminOperationError as exception:
+        return jsonify({"ok": False, "error": str(exception)}), 400
+    return jsonify({"ok": True, "matches": matches}), 200
+
+
+@app.post("/remove-data/delete")
+def remove_data_delete():
+    body, error = _admin_json_body()
+    if error:
+        return error
+    try:
+        result = remove_player_identity(
+            _string_field(body, "uid"),
+            _string_field(body, "confirmation"),
+            admin_uid=session.get("admin_uid", "local-admin"),
+            storage_bucket=get_storage_bucket(),
+        )
+    except PlayerNotFound as exception:
+        return jsonify({"ok": False, "error": str(exception)}), 404
+    except AdminOperationError as exception:
+        return jsonify({"ok": False, "error": str(exception)}), 400
+    return jsonify({"ok": True, **result}), 200
 
 
 @app.post("/check-edit/find")
