@@ -25,7 +25,7 @@ class AddMoneyPanel extends StatefulWidget {
 }
 
 class AddMoneyPanelState extends State<AddMoneyPanel> {
-  static const List<int> _chips = <int>[1, 10, 50, 100];
+  static const List<int> _chips = <int>[5, 10, 50, 100];
 
   final TextEditingController _ctl = TextEditingController(text: '100');
   final FocusNode _focus = FocusNode();

@@ -694,7 +694,7 @@ class _LogoutDialog extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Log out of RudelySmash?',
+                    'Log out of Rivalon?',
                     textAlign: TextAlign.center,
                     style: _t(16, 600, Colors.white, h: 1.3),
                   ),

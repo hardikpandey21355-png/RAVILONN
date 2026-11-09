@@ -6,7 +6,7 @@ from app.core.firestore import get_db
 
 
 DEFAULT_SETTINGS = {
-    "minAdd": 1,
+    "minAdd": 5,
     "maxAdd": 100,
     "minWithdraw": 20,
     "dailyLimit": 100,

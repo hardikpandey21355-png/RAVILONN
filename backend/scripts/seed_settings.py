@@ -5,6 +5,7 @@ from pathlib import Path
 
 import firebase_admin
 from firebase_admin import credentials, firestore
+from dotenv import load_dotenv
 
 backend_root = str(Path(__file__).resolve().parents[1])
 if backend_root not in sys.path:
@@ -16,11 +17,14 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--test-minimum",
-        action="store_true",
-        help="Set the existing settings/app minAdd value to 1 rupee.",
+        "--min-add",
+        type=int,
+        help="Set settings/app minAdd without changing the other settings.",
     )
     args = parser.parse_args()
+    if args.min_add is not None and args.min_add < 1:
+        parser.error("--min-add must be at least 1 rupee.")
+    load_dotenv(Path(backend_root) / ".env")
     try:
         firebase_app = firebase_admin.get_app()
     except ValueError:
@@ -40,13 +44,16 @@ def main() -> None:
     db = firestore.client(app=firebase_app)
     settings_ref = db.collection("settings").document("app")
     if settings_ref.get().exists:
-        if args.test_minimum:
-            settings_ref.set({"minAdd": 1}, merge=True)
-            print("Updated settings/app minAdd to 1 rupee for testing.")
+        if args.min_add is not None:
+            settings_ref.set({"minAdd": args.min_add}, merge=True)
+            print(f"Updated settings/app minAdd to {args.min_add} rupees.")
             return
         print("settings/app already exists; leaving it unchanged.")
         return
-    settings_ref.set(DEFAULT_SETTINGS)
+    settings = dict(DEFAULT_SETTINGS)
+    if args.min_add is not None:
+        settings["minAdd"] = args.min_add
+    settings_ref.set(settings)
     print("Created settings/app with default wallet limits.")
 
 

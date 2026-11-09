@@ -1340,7 +1340,7 @@ class IntroOverlay extends StatefulWidget {
 }
 
 class _IntroOverlayState extends State<IntroOverlay>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final VideoPlayerController _v = VideoPlayerController.asset(
     'assets/video/intro.mp4',
   );
@@ -1361,7 +1361,15 @@ class _IntroOverlayState extends State<IntroOverlay>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeVideo();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _resumeVideo();
+    }
   }
 
   Future<void> _initializeVideo() async {
@@ -1369,10 +1377,26 @@ class _IntroOverlayState extends State<IntroOverlay>
       await _v.initialize();
       if (!mounted) return;
       await _v.setVolume(1);
+      await _v.seekTo(Duration.zero);
       setState(() => _ready = true);
       _v.addListener(_tick);
       await _v.play();
       await _mark();
+    } catch (_) {
+      _close();
+    }
+  }
+
+  Future<void> _resumeVideo() async {
+    if (!mounted || !_ready || _closed || _ending || _v.value.isPlaying) {
+      return;
+    }
+    try {
+      if (_v.value.duration > Duration.zero &&
+          _v.value.position >= _v.value.duration) {
+        await _v.seekTo(Duration.zero);
+      }
+      await _v.play();
     } catch (_) {
       _close();
     }
@@ -1412,6 +1436,7 @@ class _IntroOverlayState extends State<IntroOverlay>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _volTimer?.cancel();
     _v.removeListener(_tick);
     _v.dispose();

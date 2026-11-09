@@ -228,8 +228,10 @@ class RivalonApp extends StatelessWidget {
                 walletChip: WalletChip(
                   balanceListenable: AuthSession.walletTotal,
                 ),
-                onBrowseTournaments: () =>
-                    Navigator.of(context).pushNamed('/tournaments'),
+                onBrowseTournaments: () => Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).pushNamed('/tournaments'),
                 onLoadMatches: MatchesRepository().load,
                 bottomInset: const EdgeInsets.only(bottom: 100),
               ),

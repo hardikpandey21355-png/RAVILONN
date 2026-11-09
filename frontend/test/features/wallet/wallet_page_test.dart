@@ -175,7 +175,7 @@ void main() {
         home: Scaffold(
           body: AddMoneyPanel(
             notify: (_, _, _) {},
-            minAdd: 1,
+            minAdd: 5,
             maxAdd: 100,
             onSubmit: (_) => completion.future,
           ),
@@ -194,6 +194,35 @@ void main() {
     expect(find.text('Add ₹100'), findsOneWidget);
   });
 
+  testWidgets('add money presets submit the selected rupee amount', (
+    tester,
+  ) async {
+    int? submittedAmount;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AddMoneyPanel(
+            notify: (_, _, _) {},
+            minAdd: 5,
+            maxAdd: 100,
+            onSubmit: (amount) async => submittedAmount = amount,
+          ),
+        ),
+      ),
+    );
+
+    for (final amount in <int>[5, 10, 50, 100]) {
+      expect(find.text('₹$amount'), findsOneWidget);
+    }
+
+    await tester.tap(find.text('₹5'));
+    await tester.pump();
+    await tester.tap(find.text('Add ₹5'));
+    await tester.pumpAndSettle();
+
+    expect(submittedAmount, 5);
+  });
+
   testWidgets('off mode disables Add money and shows the pause label', (
     tester,
   ) async {
@@ -203,7 +232,7 @@ void main() {
         home: Scaffold(
           body: AddMoneyPanel(
             notify: (_, _, _) {},
-            minAdd: 1,
+            minAdd: 5,
             maxAdd: 100,
             paymentMethod: 'off',
             onSubmit: (_) async => submitted = true,
@@ -254,7 +283,7 @@ void main() {
         home: Scaffold(
           body: AddMoneyPanel(
             notify: (_, _, _) {},
-            minAdd: 1,
+            minAdd: 5,
             maxAdd: 100,
             paymentMethod: 'manual',
             onSubmit: (_) async => submitted = true,

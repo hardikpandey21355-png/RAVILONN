@@ -22,6 +22,31 @@ python run.py
 `python app.py` is also supported. No application data is written to SQLite or
 local files. Firebase ID-token verification uses Google's public signing keys.
 
+## Deploy the API to Vercel
+
+Import the repository into Vercel and set the project Root Directory to
+`backend`. Keep the Flask preset and default build/install settings. Vercel
+detects the Flask `app` in `app.py` and installs dependencies from
+`requirements.txt`.
+
+Add these environment variables in Vercel Project Settings before deploying:
+
+- `FIREBASE_PROJECT_ID`: `ravilon-19a47`.
+- `FIREBASE_SERVICE_ACCOUNT_JSON`: the complete Firebase service-account JSON
+  object, pasted as the value. Treat this as a secret; do not commit it or share
+  it in chat. The API also supports the existing `FIREBASE_CREDENTIALS` file
+  path for local and Render deployments.
+- `STORAGE_BUCKET`: set this if the API needs private UPI screenshot or
+  tournament banner uploads.
+- `TRANZUPI_API_KEY` and `TRANZUPI_REDIRECT_URL`: set these if hosted payments
+  are enabled. The redirect URL should use the deployed API's public HTTPS URL.
+
+Deploy, then verify `https://<deployment-domain>/health` returns
+`{"ok":true,"service":"ravilon-backend"}`. Test authenticated API endpoints and
+payment callbacks before switching the APK's API URL or disabling the Render
+service. Update the TranZUPI webhook URL to
+`https://<deployment-domain>/api/payments/tranzupi/webhook` when switching.
+
 ## Endpoints
 
 All `/api` endpoints require a Firebase ID token in the `Authorization: Bearer`
@@ -69,8 +94,7 @@ preserve the existing top-up behavior.
 
 ## Firestore setup
 
-The defaults in `settings/app` are `minAdd: 1` (temporary testing minimum),
-`maxAdd: 100`,
+The defaults in `settings/app` are `minAdd: 5`, `maxAdd: 100`,
 `minWithdraw: 20`, `dailyLimit: 100`, and `maintenance: false`. If the settings
 document is absent, the API uses these defaults without creating a document.
 Create it once (without overwriting an existing settings document) with:
@@ -79,11 +103,10 @@ Create it once (without overwriting an existing settings document) with:
 python scripts/seed_settings.py
 ```
 
-For an existing settings document, apply the requested temporary ₹1 testing
-minimum without changing other settings:
+For an existing settings document, update only the minimum add-money amount:
 
 ```powershell
-python scripts/seed_settings.py --test-minimum
+python scripts/seed_settings.py --min-add 5
 ```
 
 Configure TranZUPI locally in `backend/.env`; never commit or share the API key:

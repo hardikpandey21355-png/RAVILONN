@@ -23,7 +23,7 @@ class TranzUPIApiTests(unittest.TestCase):
                     "maintenance": False,
                     "maintenanceMessage": "",
                     "maintenanceEta": "",
-                    "minAdd": 1,
+                    "minAdd": 5,
                     "maxAdd": 100,
                     "addMoneyMethod": "gateway",
                 },
@@ -34,7 +34,7 @@ class TranzUPIApiTests(unittest.TestCase):
                     "maintenance": False,
                     "maintenanceMessage": "",
                     "maintenanceEta": "",
-                    "minAdd": 1,
+                    "minAdd": 5,
                     "maxAdd": 100,
                     "addMoneyMethod": "gateway",
                 },
@@ -46,7 +46,7 @@ class TranzUPIApiTests(unittest.TestCase):
             item.start()
             self.addCleanup(item.stop)
 
-    def test_create_payment_order_accepts_one_rupee_minimum(self) -> None:
+    def test_create_payment_order_accepts_five_rupee_minimum(self) -> None:
         with patch(
             "app.routes.create_payment_order",
             return_value={
@@ -57,7 +57,7 @@ class TranzUPIApiTests(unittest.TestCase):
         ) as create_order:
             response = self.client.post(
                 "/api/wallet/payment-orders",
-                json={"amount": 1},
+                json={"amount": 5},
                 headers=self.headers,
             )
 
@@ -65,11 +65,23 @@ class TranzUPIApiTests(unittest.TestCase):
         self.assertEqual(response.json["orderId"], "RV123")
         create_order.assert_called_once()
 
+    def test_create_payment_order_rejects_amount_below_five_rupees(self) -> None:
+        with patch("app.routes.create_payment_order") as create_order:
+            response = self.client.post(
+                "/api/wallet/payment-orders",
+                json={"amount": 4},
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("between 5 and 100", response.json["error"])
+        create_order.assert_not_called()
+
     def test_create_payment_order_is_blocked_when_add_money_is_off(self) -> None:
         with (
             patch(
                 "app.routes.get_settings",
-                return_value={"addMoneyMethod": "off", "minAdd": 1, "maxAdd": 100},
+                return_value={"addMoneyMethod": "off", "minAdd": 5, "maxAdd": 100},
             ),
             patch("app.routes.create_payment_order") as create_order,
         ):
@@ -90,7 +102,7 @@ class TranzUPIApiTests(unittest.TestCase):
         with (
             patch(
                 "app.routes.get_settings",
-                return_value={"addMoneyMethod": "manual", "minAdd": 1, "maxAdd": 100},
+                return_value={"addMoneyMethod": "manual", "minAdd": 5, "maxAdd": 100},
             ),
             patch("app.routes.create_payment_order") as create_order,
         ):

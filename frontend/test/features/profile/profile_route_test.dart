@@ -17,4 +17,17 @@ void main() {
 
     expect(find.text('Manage • Verify • Play'), findsOneWidget);
   });
+
+  testWidgets('logout confirmation uses the Rivalon brand', (tester) async {
+    await tester.pumpWidget(const RivalonApp(initialRoute: '/profile'));
+    await tester.pump(const Duration(milliseconds: 600));
+
+    await tester.ensureVisible(find.text('Log out'));
+    await tester.pump();
+    await tester.tap(find.text('Log out'));
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(find.text('Log out of Rivalon?'), findsOneWidget);
+    expect(find.text('Log out of RudelySmash?'), findsNothing);
+  });
 }

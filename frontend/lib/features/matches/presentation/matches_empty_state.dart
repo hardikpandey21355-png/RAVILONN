@@ -169,9 +169,13 @@ class _BrowseButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'Browse tournaments',
-                  style: _t(13, FontWeight.w600, rsC(234, 255, 247)),
+                Flexible(
+                  child: Text(
+                    'Browse tournaments',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _t(13, FontWeight.w600, rsC(234, 255, 247)),
+                  ),
                 ),
                 const SizedBox(width: 6),
                 _icon(_pArrow, '#eafff7', 15),

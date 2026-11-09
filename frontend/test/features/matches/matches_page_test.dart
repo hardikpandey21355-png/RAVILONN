@@ -209,6 +209,36 @@ void main() {
     expect(find.text('Retry'), findsOneWidget);
   });
 
+  testWidgets('Browse tournaments opens the tournaments route', (tester) async {
+    MockData.joinedIds.value = <String>{};
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: MatchesPage(
+              matches: const [],
+              onBrowseTournaments: () => Navigator.of(
+                context,
+                rootNavigator: true,
+              ).pushNamed('/tournaments'),
+            ),
+          ),
+        ),
+        routes: {
+          '/tournaments': (_) =>
+              const Scaffold(body: Text('Tournament list destination')),
+        },
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    await tester.ensureVisible(find.text('Browse tournaments'));
+    await tester.tap(find.text('Browse tournaments'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tournament list destination'), findsOneWidget);
+  });
+
   testWidgets('leaving a joined match updates shared join and wallet state', (
     tester,
   ) async {
