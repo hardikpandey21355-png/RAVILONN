@@ -170,6 +170,94 @@ class AppUpdateRewardRevocationTests(unittest.TestCase):
             3,
         )
 
+    def test_app_bonus_preview_and_distribution_are_idempotent(self):
+        self.db = Database(
+            {
+                ("users", "already-credited"): {"isHeld": True},
+                (
+                    "users/already-credited/appBonusCampaigns",
+                    "summer-2026",
+                ): {"campaignId": "summer-2026", "amount": 20},
+                ("wallets", "already-credited"): {"deposited": 20},
+                ("users", "new-player"): {},
+                ("wallets", "new-player"): {"deposited": 5},
+            }
+        )
+        self.transaction = Transaction(self.db)
+        self.applied = []
+
+        with (
+            patch.object(
+                admin_service,
+                "run_transaction",
+                side_effect=self._run_transaction,
+            ),
+            patch.object(admin_service, "apply", side_effect=self._apply),
+        ):
+            preview = admin_service.preview_app_bonus_distribution(
+                " Summer-2026 ",
+                20,
+                db=self.db,
+            )
+            result = admin_service.distribute_app_bonus(
+                "summer-2026",
+                20,
+                admin_uid="admin-1",
+                db=self.db,
+            )
+            repeated_result = admin_service.distribute_app_bonus(
+                "summer-2026",
+                20,
+                admin_uid="admin-1",
+                db=self.db,
+            )
+
+        self.assertEqual(
+            preview,
+            {
+                "campaignId": "summer-2026",
+                "amountPerUser": 20,
+                "accountCount": 2,
+                "alreadyCredited": 1,
+                "eligibleCount": 1,
+                "estimatedTotal": 20,
+            },
+        )
+        self.assertEqual(result["accountsCredited"], 1)
+        self.assertEqual(result["amountCredited"], 20)
+        self.assertEqual(repeated_result["accountsCredited"], 0)
+        self.assertEqual(repeated_result["accountsAlreadyCredited"], 2)
+        self.assertEqual(
+            self.applied[0][1]["deltas"],
+            {"deposited": 20},
+        )
+        self.assertEqual(self.db.data[("wallets", "new-player")]["deposited"], 25)
+        self.assertEqual(
+            self.db.data[
+                ("users/new-player/appBonusCampaigns", "summer-2026")
+            ]["adminUid"],
+            "admin-1",
+        )
+        self.assertEqual(
+            len([path for path, _ in self.db.data if path == "auditLogs"]),
+            1,
+        )
+
+    def test_app_bonus_rejects_invalid_campaign_and_amount(self):
+        for campaign_id, amount in (
+            ("../all-users", 10),
+            ("summer-2026", 0),
+            ("summer-2026", True),
+            ("summer-2026", 10001),
+        ):
+            with self.subTest(campaign_id=campaign_id, amount=amount):
+                with self.assertRaises(admin_service.AdminOperationError):
+                    admin_service.preview_app_bonus_distribution(
+                        campaign_id,
+                        amount,
+                        db=self.db,
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

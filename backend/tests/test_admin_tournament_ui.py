@@ -717,31 +717,101 @@ class AdminTournamentUiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("pending withdrawals", response.json["error"])
 
-    def test_remove_app_bonus_page_and_action_require_confirmation_and_csrf(self) -> None:
-        page = self.client.get("/remove-app-bonus")
+    def test_app_bonus_page_previews_and_requires_confirmed_distribution(self) -> None:
+        page = self.client.get("/app-bonus")
         self.assertEqual(page.status_code, 200)
-        self.assertIn(b"Remove the app-update reward", page.data)
+        self.assertIn(b"Give a deposit bonus to all users", page.data)
+        self.assertIn(b"including accounts on hold", page.data)
 
-        with patch.object(admin_app, "revoke_app_update_bonuses") as revoke:
-            missing_csrf = self.client.post(
-                "/remove-app-bonus/run",
-                json={"confirmation": "REMOVE APP REWARDS"},
+        preview = {
+            "campaignId": "summer-2026",
+            "amountPerUser": 20,
+            "accountCount": 5,
+            "alreadyCredited": 1,
+            "eligibleCount": 4,
+            "estimatedTotal": 80,
+        }
+        with patch.object(
+            admin_app,
+            "preview_app_bonus_distribution",
+            return_value=preview,
+        ) as preview_campaign:
+            response = self.client.post(
+                "/app-bonus/preview",
+                json={"campaignId": "summer-2026", "amount": 20},
+                headers={"X-CSRF": self._csrf()},
             )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"ok": True, **preview})
+        preview_campaign.assert_called_once_with("summer-2026", 20)
+
+        with patch.object(admin_app, "distribute_app_bonus") as distribute:
+            missing_csrf = self.client.post(
+                "/app-bonus/distribute",
+                json={
+                    "campaignId": "summer-2026",
+                    "amount": 20,
+                    "confirmation": "CREDIT APP BONUS",
+                },
+            )
+            wrong_confirmation = self.client.post(
+                "/app-bonus/distribute",
+                json={"campaignId": "summer-2026", "amount": 20},
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(missing_csrf.status_code, 400)
+        self.assertEqual(wrong_confirmation.status_code, 400)
+        distribute.assert_not_called()
+
+        totals = {
+            "campaignId": "summer-2026",
+            "amountPerUser": 20,
+            "accountsProcessed": 4,
+            "accountsCredited": 4,
+            "accountsAlreadyCredited": 0,
+            "amountCredited": 80,
+        }
+        with patch.object(
+            admin_app,
+            "distribute_app_bonus",
+            return_value=totals,
+        ) as distribute:
+            response = self.client.post(
+                "/app-bonus/distribute",
+                json={
+                    "campaignId": "summer-2026",
+                    "amount": 20,
+                    "confirmation": "CREDIT APP BONUS",
+                },
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"ok": True, **totals})
+        distribute.assert_called_once_with(
+            "summer-2026",
+            20,
+            admin_uid="local-admin",
+        )
+
+    def test_app_bonus_revoke_action_still_requires_confirmation(self) -> None:
+        with patch.object(admin_app, "revoke_app_update_bonuses") as revoke:
             wrong_confirmation = self.client.post(
                 "/remove-app-bonus/run",
                 json={"confirmation": "wrong"},
                 headers={"X-CSRF": self._csrf()},
             )
 
-        self.assertEqual(missing_csrf.status_code, 400)
         self.assertEqual(wrong_confirmation.status_code, 400)
         revoke.assert_not_called()
 
         totals = {
-            "accountsProcessed": 2,
+            "accountsProcessed": 1,
             "accountsWithBalance": 1,
             "amountRemoved": 5,
-            "amountUnavailable": 15,
+            "amountUnavailable": 5,
         }
         with patch.object(
             admin_app,

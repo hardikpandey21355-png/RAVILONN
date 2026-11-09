@@ -53,9 +53,12 @@ The authenticated `GET /api/app-update` endpoint provides the latest Android
 version and download URL. The current release is build 4 (`1.1.0`); the backend
 sets `forceUpdate` for clients that support that flag. The authenticated
 `POST /api/app-update/claim` endpoint is retained for compatibility but cannot
-grant rewards. A CSRF-protected Admin action at `/remove-app-bonus` can revoke
-unspent build-2 rewards once; it removes funds only from the recorded reward
-bucket, never takes the wallet below zero, and reports any already-spent amount.
+grant rewards. The Admin's `/app-bonus` section can revoke unspent build-2
+rewards and manually distribute future deposit bonuses. Distribution requires
+a preview and explicit confirmation, uses a unique campaign ID to prevent
+duplicate credits, and includes all user profiles (including held accounts).
+Revocation removes funds only from the recorded reward bucket, never takes the
+wallet below zero, and reports any already-spent amount.
 
 The release code, version name, download URL, and update message have defaults
 in `settings_service.py`. Existing APK builds 2 and 3 do not understand the

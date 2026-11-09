@@ -28,6 +28,7 @@ from app.services.admin_service import (
     clear_settled_withdrawals,
     credit_wallet as credit_player_wallet,
     deduct_wallet,
+    distribute_app_bonus,
     delete_settled_withdrawal,
     find_player,
     remove_player_identity,
@@ -37,6 +38,7 @@ from app.services.admin_service import (
     list_wallet_credits,
     list_withdrawals,
     player_account_details,
+    preview_app_bonus_distribution,
     revoke_app_update_bonuses,
     save_tournament_results,
     settle_withdrawal,
@@ -335,9 +337,45 @@ def remove_data():
     return render_page("remove_data.html", "remove_data")
 
 
+@app.get("/app-bonus")
 @app.get("/remove-app-bonus")
-def remove_app_bonus():
-    return render_page("remove_app_bonus.html", "remove_app_bonus")
+def app_bonus():
+    return render_page("remove_app_bonus.html", "app_bonus")
+
+
+@app.post("/app-bonus/preview")
+def app_bonus_preview():
+    body, error = _admin_json_body()
+    if error:
+        return error
+    try:
+        result = preview_app_bonus_distribution(
+            _string_field(body, "campaignId"),
+            _whole_rupees(body.get("amount")),
+        )
+    except AdminOperationError as exception:
+        return jsonify({"ok": False, "error": str(exception)}), 400
+    return jsonify({"ok": True, **result}), 200
+
+
+@app.post("/app-bonus/distribute")
+def app_bonus_distribute():
+    body, error = _admin_json_body()
+    if error:
+        return error
+    if _string_field(body, "confirmation") != "CREDIT APP BONUS":
+        return jsonify(
+            {"ok": False, "error": 'Type "CREDIT APP BONUS" exactly to confirm.'}
+        ), 400
+    try:
+        result = distribute_app_bonus(
+            _string_field(body, "campaignId"),
+            _whole_rupees(body.get("amount")),
+            admin_uid=session.get("admin_uid", "local-admin"),
+        )
+    except AdminOperationError as exception:
+        return jsonify({"ok": False, "error": str(exception)}), 400
+    return jsonify({"ok": True, **result}), 200
 
 
 @app.post("/remove-app-bonus/run")

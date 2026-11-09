@@ -19,6 +19,8 @@ from app.services.wallet_service import InsufficientFunds, apply, wallet_for
 
 IST = ZoneInfo("Asia/Kolkata")
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+APP_BONUS_CAMPAIGN_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{2,39}$")
+MAX_APP_BONUS_PER_USER = 10000
 
 
 class AdminOperationError(ValueError):
@@ -337,6 +339,134 @@ def revoke_app_update_bonuses(
         totals["amountUnavailable"] += result["unavailable"]
 
     return totals
+
+
+def preview_app_bonus_distribution(
+    campaign_id: str,
+    amount: int,
+    db: Any = None,
+) -> dict[str, int | str]:
+    campaign_id, amount = _validate_app_bonus_campaign(campaign_id, amount)
+    database = db or get_db()
+    accounts = list(database.collection("users").stream())
+    already_credited = sum(
+        1
+        for account in accounts
+        if account.reference.collection("appBonusCampaigns")
+        .document(campaign_id)
+        .get()
+        .exists
+    )
+    account_count = len(accounts)
+    eligible_count = account_count - already_credited
+    return {
+        "campaignId": campaign_id,
+        "amountPerUser": amount,
+        "accountCount": account_count,
+        "alreadyCredited": already_credited,
+        "eligibleCount": eligible_count,
+        "estimatedTotal": eligible_count * amount,
+    }
+
+
+def distribute_app_bonus(
+    campaign_id: str,
+    amount: int,
+    *,
+    admin_uid: str = "local-admin",
+    db: Any = None,
+) -> dict[str, int | str]:
+    campaign_id, amount = _validate_app_bonus_campaign(campaign_id, amount)
+    database = db or get_db()
+    totals: dict[str, int | str] = {
+        "campaignId": campaign_id,
+        "amountPerUser": amount,
+        "accountsProcessed": 0,
+        "accountsCredited": 0,
+        "accountsAlreadyCredited": 0,
+        "amountCredited": 0,
+    }
+
+    for account in database.collection("users").stream():
+        uid = account.id
+        claim_ref = account.reference.collection("appBonusCampaigns").document(
+            campaign_id
+        )
+        audit_ref = database.collection("auditLogs").document()
+
+        def operation(tx: Any) -> bool:
+            claim_snapshot = claim_ref.get(transaction=tx)
+            if claim_snapshot.exists:
+                return False
+            apply(
+                uid,
+                {
+                    "deltas": {"deposited": amount},
+                    "kind": "admin_app_bonus",
+                    "title": "App bonus",
+                    "amt": amount,
+                    "dir": "in",
+                    "status": "paid",
+                    "ref": f"app-bonus-{campaign_id}",
+                },
+                tx,
+            )
+            tx.create(
+                claim_ref,
+                {
+                    "campaignId": campaign_id,
+                    "amount": amount,
+                    "creditBucket": "deposited",
+                    "adminUid": admin_uid,
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                },
+            )
+            tx.create(
+                audit_ref,
+                {
+                    "uid": uid,
+                    "adminUid": admin_uid,
+                    "action": "admin_app_bonus",
+                    "details": {
+                        "campaignId": campaign_id,
+                        "amount": amount,
+                        "bucket": "deposited",
+                    },
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                },
+            )
+            return True
+
+        credited = run_transaction(database, operation)
+        totals["accountsProcessed"] += 1
+        if credited:
+            totals["accountsCredited"] += 1
+            totals["amountCredited"] += amount
+        else:
+            totals["accountsAlreadyCredited"] += 1
+
+    return totals
+
+
+def _validate_app_bonus_campaign(campaign_id: str, amount: int) -> tuple[str, int]:
+    if not isinstance(campaign_id, str):
+        raise AdminOperationError(
+            "Campaign ID must use 3-40 lowercase letters, numbers, dashes, or underscores."
+        )
+    campaign_id = campaign_id.strip().lower()
+    if not APP_BONUS_CAMPAIGN_PATTERN.fullmatch(campaign_id):
+        raise AdminOperationError(
+            "Campaign ID must use 3-40 lowercase letters, numbers, dashes, or underscores."
+        )
+    if (
+        isinstance(amount, bool)
+        or not isinstance(amount, int)
+        or not 1 <= amount <= MAX_APP_BONUS_PER_USER
+    ):
+        raise AdminOperationError(
+            f"Bonus amount must be a whole number from ₹1 to ₹{MAX_APP_BONUS_PER_USER} per user."
+        )
+    return campaign_id, amount
 
 
 def find_player(query: str, db: Any = None) -> dict[str, Any]:
