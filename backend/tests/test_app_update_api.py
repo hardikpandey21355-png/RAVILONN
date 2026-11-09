@@ -28,10 +28,11 @@ class AppUpdateApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 401)
 
-    def test_update_info_returns_configured_release(self) -> None:
+    def test_update_info_forces_the_current_release_despite_saved_optional_settings(self) -> None:
         settings = {
             "maintenance": False,
-            "appUpdateEnabled": True,
+            "appUpdateEnabled": False,
+            "appUpdateForce": False,
             "appLatestVersionCode": 2,
             "appLatestVersionName": "1.1.0",
             "appDownloadUrl": "https://example.com/Ravilon.apk",
@@ -53,14 +54,15 @@ class AppUpdateApiTests(unittest.TestCase):
             {
                 "ok": True,
                 "enabled": True,
-                "latestBuildNumber": 3,
+                "forceUpdate": True,
+                "latestBuildNumber": 4,
                 "latestVersionName": "1.1.0",
                 "downloadUrl": "https://example.com/Ravilon.apk",
-                "message": "An update is available.",
+                "message": "App use karte rehne ke liye latest update install karein.",
             },
         )
 
-    def test_update_reward_is_limited_to_authenticated_user_and_build(self) -> None:
+    def test_update_reward_claim_is_disabled_even_if_saved_setting_enables_it(self) -> None:
         settings = {
             "maintenance": False,
             "appBonusEnabled": True,
@@ -70,18 +72,14 @@ class AppUpdateApiTests(unittest.TestCase):
             patch("app.routes._require_user", return_value=({}, None)),
             patch("app.routes.get_settings", return_value=settings),
             patch("app.services.settings_service.get_settings", return_value=settings),
-            patch(
-                "app.routes.migrate_app_update_bonus_to_deposit",
-                return_value=0,
-            ) as migrate,
-            patch("app.routes.claim_app_update_bonus", return_value=True) as claim,
+            patch("app.routes.claim_app_update_bonus", return_value=False) as claim,
             patch(
                 "app.routes.wallet_for",
                 return_value={
-                    "deposited": 10,
+                    "deposited": 0,
                     "bonus": 0,
                     "winnings": 0,
-                    "total": 10,
+                    "total": 0,
                 },
             ),
         ):
@@ -92,15 +90,13 @@ class AppUpdateApiTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["amount"], 10)
-        self.assertEqual(response.json["wallet"]["deposited"], 10)
-        self.assertEqual(response.json["migratedToDeposit"], 0)
-        migrate.assert_called_once_with("player-1", campaign_build_number=2)
+        self.assertEqual(response.json["amount"], 0)
+        self.assertFalse(response.json["credited"])
         claim.assert_called_once_with(
             "player-1",
             2,
             campaign_build_number=2,
-            enabled=True,
+            enabled=False,
         )
 
     def test_update_reward_rejects_non_integer_build(self) -> None:

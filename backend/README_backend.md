@@ -50,21 +50,19 @@ service. Update the TranZUPI webhook URL to
 ## Mobile app updates
 
 The authenticated `GET /api/app-update` endpoint provides the latest Android
-version and download URL. Builds that include the update checker show an
-optional Update / Skip prompt only when the configured version code is newer.
-The authenticated `POST /api/app-update/claim` endpoint grants the one-time
-₹10 bonus to the deposited wallet bucket for eligible builds. A Firestore
-transaction prevents an account from claiming the same campaign twice. For the
-original campaign, existing claims that were credited to the bonus bucket are
-transferred to the deposited bucket up to the remaining bonus balance.
+version and download URL. The current release is build 4 (`1.1.0`); the backend
+sets `forceUpdate` for clients that support that flag. The authenticated
+`POST /api/app-update/claim` endpoint is retained for compatibility but cannot
+grant rewards. A CSRF-protected Admin action at `/remove-app-bonus` can revoke
+unspent build-2 rewards once; it removes funds only from the recorded reward
+bucket, never takes the wallet below zero, and reports any already-spent amount.
 
-These settings are read from `settings/app` and fall back to the defaults in
-`settings_service.py`:
-
-- `appUpdateEnabled`, `appLatestVersionCode`, `appLatestVersionName`,
-  `appDownloadUrl`, and `appUpdateMessage` control the update prompt.
-- `appBonusEnabled` and `appBonusBuildNumber` control the one-time bonus
-  campaign.
+The release code, version name, download URL, and update message have defaults
+in `settings_service.py`. Existing APK builds 2 and 3 do not understand the
+mandatory-update flag, so the server cannot prevent those installed versions
+from skipping the prompt. Those builds remain usable. Only a client build that
+implements `forceUpdate` can enforce the non-dismissible update screen when a
+newer build is available.
 
 Deploy the backend update before distributing the APK. Existing APKs that do
 not contain the update checker cannot display the prompt; announce the release

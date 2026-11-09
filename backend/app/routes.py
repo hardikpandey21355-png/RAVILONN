@@ -44,7 +44,6 @@ from app.services.wallet_service import (
     InsufficientFunds,
     apply,
     claim_app_update_bonus,
-    migrate_app_update_bonus_to_deposit,
     wallet_for,
 )
 
@@ -215,14 +214,13 @@ def app_update_info() -> tuple[Any, int]:
     download_url = settings["appDownloadUrl"]
     if not isinstance(download_url, str):
         download_url = ""
-    message = settings["appUpdateMessage"]
-    if not isinstance(message, str):
-        message = "A new Ravilon update is available."
+    message = "App use karte rehne ke liye latest update install karein."
 
     return jsonify(
         {
             "ok": True,
-            "enabled": settings["appUpdateEnabled"] is True,
+            "enabled": True,
+            "forceUpdate": True,
             "latestBuildNumber": version_code,
             "latestVersionName": version_name,
             "downloadUrl": download_url,
@@ -248,19 +246,15 @@ def claim_app_update_reward() -> tuple[Any, int]:
         return api_error("App build number must be an integer.", 400)
 
     settings = get_settings()
-    campaign_build = settings["appBonusBuildNumber"]
+    campaign_build = settings.get("appBonusBuildNumber", 2)
     if isinstance(campaign_build, bool) or not isinstance(campaign_build, int):
         campaign_build = 2
     try:
-        migrated_to_deposit = migrate_app_update_bonus_to_deposit(
-            g.uid,
-            campaign_build_number=campaign_build,
-        )
         credited = claim_app_update_bonus(
             g.uid,
             build_number,
             campaign_build_number=campaign_build,
-            enabled=settings["appBonusEnabled"] is True,
+            enabled=False,
         )
     except AccountOnHold:
         return held_error()
@@ -270,7 +264,6 @@ def claim_app_update_reward() -> tuple[Any, int]:
             "ok": True,
             "credited": credited,
             "amount": 10 if credited else 0,
-            "migratedToDeposit": migrated_to_deposit,
             "wallet": wallet_for(g.uid),
         }
     ), 200

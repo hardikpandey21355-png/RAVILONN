@@ -42,6 +42,8 @@
         <svg class="i" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5M8 10h5M10.5 7.5v5"/></svg>Check and edit</a>
       <a href="{{ url_for('remove_data') }}" class="{{ 'on' if active == 'remove_data' }}">
         <svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg>Remove data</a>
+      <a href="{{ url_for('remove_app_bonus') }}" class="{{ 'on' if active == 'remove_app_bonus' }}">
+        <svg class="i" viewBox="0 0 24 24"><path d="M12 3v18M5 8h14M5 16h14"/></svg>Remove app bonus</a>
       <div class="nav-divider" role="separator"></div>
       <div class="nav-section">To be completed</div>
       <button class="nav-disabled" type="button" disabled aria-disabled="true" title="Coming later">

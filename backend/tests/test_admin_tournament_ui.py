@@ -717,6 +717,47 @@ class AdminTournamentUiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("pending withdrawals", response.json["error"])
 
+    def test_remove_app_bonus_page_and_action_require_confirmation_and_csrf(self) -> None:
+        page = self.client.get("/remove-app-bonus")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b"Remove the app-update reward", page.data)
+
+        with patch.object(admin_app, "revoke_app_update_bonuses") as revoke:
+            missing_csrf = self.client.post(
+                "/remove-app-bonus/run",
+                json={"confirmation": "REMOVE APP REWARDS"},
+            )
+            wrong_confirmation = self.client.post(
+                "/remove-app-bonus/run",
+                json={"confirmation": "wrong"},
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(missing_csrf.status_code, 400)
+        self.assertEqual(wrong_confirmation.status_code, 400)
+        revoke.assert_not_called()
+
+        totals = {
+            "accountsProcessed": 2,
+            "accountsWithBalance": 1,
+            "amountRemoved": 5,
+            "amountUnavailable": 15,
+        }
+        with patch.object(
+            admin_app,
+            "revoke_app_update_bonuses",
+            return_value=totals,
+        ) as revoke:
+            response = self.client.post(
+                "/remove-app-bonus/run",
+                json={"confirmation": "REMOVE APP REWARDS"},
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"ok": True, **totals})
+        revoke.assert_called_once_with(admin_uid="local-admin")
+
     def _csrf(self) -> str:
         with self.client.session_transaction() as session:
             return session["csrf"]

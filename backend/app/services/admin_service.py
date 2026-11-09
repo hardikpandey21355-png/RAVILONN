@@ -228,6 +228,117 @@ def remove_player_identity(
     }
 
 
+def revoke_app_update_bonuses(
+    *,
+    campaign_build_number: int = 2,
+    admin_uid: str = "local-admin",
+    db: Any = None,
+) -> dict[str, int]:
+    if (
+        isinstance(campaign_build_number, bool)
+        or not isinstance(campaign_build_number, int)
+        or campaign_build_number < 1
+    ):
+        raise AdminOperationError("App reward campaign is invalid.")
+
+    database = db or get_db()
+    totals = {
+        "accountsProcessed": 0,
+        "accountsWithBalance": 0,
+        "amountRemoved": 0,
+        "amountUnavailable": 0,
+    }
+    users = database.collection("users").stream()
+    for user_snapshot in users:
+        uid = user_snapshot.id
+        claim_ref = user_snapshot.reference.collection("appUpdateRewards").document(
+            f"build_{campaign_build_number}"
+        )
+        wallet_ref = database.collection("wallets").document(uid)
+        audit_ref = database.collection("auditLogs").document()
+
+        def operation(tx: Any) -> dict[str, int]:
+            claim_snapshot = claim_ref.get(transaction=tx)
+            if not claim_snapshot.exists:
+                return {"processed": 0, "removed": 0, "unavailable": 0}
+            claim = claim_snapshot.to_dict() or {}
+            if claim.get("revoked") is True:
+                return {"processed": 0, "removed": 0, "unavailable": 0}
+
+            wallet_snapshot = wallet_ref.get(transaction=tx)
+            wallet = wallet_snapshot.to_dict() if wallet_snapshot.exists else {}
+            bucket = claim.get("creditBucket")
+            if bucket not in {"bonus", "deposited"}:
+                bucket = "bonus"
+            original_amount = claim.get("amount", 10)
+            if (
+                isinstance(original_amount, bool)
+                or not isinstance(original_amount, int)
+                or original_amount < 0
+            ):
+                raise AdminOperationError(
+                    f"Reward claim for {uid} has an invalid amount."
+                )
+            reward_amount = min(original_amount, 10)
+            balance = wallet.get(bucket, 0)
+            if isinstance(balance, bool) or not isinstance(balance, int) or balance < 0:
+                raise AdminOperationError(
+                    f"Wallet balance for {uid} is invalid; reward removal stopped."
+                )
+            removed = min(balance, reward_amount)
+            if removed:
+                apply(
+                    uid,
+                    {
+                        "deltas": {bucket: -removed},
+                        "kind": "app_update_bonus_revoked",
+                        "title": "App update reward removed",
+                        "amt": removed,
+                        "dir": "out",
+                        "status": "paid",
+                        "ref": f"apk-update-build-{campaign_build_number}",
+                    },
+                    tx,
+                )
+
+            unavailable = reward_amount - removed
+            tx.update(
+                claim_ref,
+                {
+                    "revoked": True,
+                    "revokedAmount": removed,
+                    "unavailableAmount": unavailable,
+                    "revokedBucket": bucket,
+                    "revokedBy": admin_uid,
+                    "revokedAt": firestore.SERVER_TIMESTAMP,
+                },
+            )
+            tx.create(
+                audit_ref,
+                {
+                    "uid": uid,
+                    "adminUid": admin_uid,
+                    "action": "app_update_bonus_revoked",
+                    "details": {
+                        "campaignBuildNumber": campaign_build_number,
+                        "bucket": bucket,
+                        "amountRemoved": removed,
+                        "amountUnavailable": unavailable,
+                    },
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                },
+            )
+            return {"processed": 1, "removed": removed, "unavailable": unavailable}
+
+        result = run_transaction(database, operation)
+        totals["accountsProcessed"] += result["processed"]
+        totals["accountsWithBalance"] += int(result["removed"] > 0)
+        totals["amountRemoved"] += result["removed"]
+        totals["amountUnavailable"] += result["unavailable"]
+
+    return totals
+
+
 def find_player(query: str, db: Any = None) -> dict[str, Any]:
     database = db or get_db()
     query = query.strip()

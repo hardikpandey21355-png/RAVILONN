@@ -5,7 +5,7 @@ from firebase_admin import firestore
 from app.core.firestore import get_db
 
 
-LATEST_APP_BUILD_NUMBER = 3
+LATEST_APP_BUILD_NUMBER = 4
 
 
 DEFAULT_SETTINGS = {
@@ -18,17 +18,15 @@ DEFAULT_SETTINGS = {
     "maintenanceMessage": "We will be back shortly.",
     "maintenanceEta": "",
     "appUpdateEnabled": True,
+    "appUpdateForce": True,
     "appLatestVersionCode": LATEST_APP_BUILD_NUMBER,
     "appLatestVersionName": "1.1.0",
     "appDownloadUrl": (
         "https://github.com/hardikpandey21355-png/"
         "Rival-on-website/raw/refs/heads/main/Ravilon.apk"
     ),
-    "appUpdateMessage": (
-        "Eligible users ko one-time ₹10 reward deposit balance mein milega. "
-        "Tournament mein real cash jeetne ka mauka paayein."
-    ),
-    "appBonusEnabled": True,
+    "appUpdateMessage": "App use karte rehne ke liye latest update install karein.",
+    "appBonusEnabled": False,
     "appBonusBuildNumber": 2,
 }
 

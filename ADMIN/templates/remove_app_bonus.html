@@ -1,0 +1,77 @@
+{% extends "_layout.html" %}
+{% block title %}Remove app bonus{% endblock %}
+{% block content %}
+<style>
+.panel{max-width:900px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:18px}
+.panel h2{font-size:16px;margin-bottom:8px}
+.hint{font-size:12px;color:var(--muted);line-height:1.7;margin:0 0 14px}
+.warning{padding:14px;border:1px solid rgba(248,113,113,.38);border-radius:12px;background:rgba(248,113,113,.08);color:#ffd0d0;font-size:12px;line-height:1.7}
+.confirm{max-width:560px;margin-top:16px}
+.confirm label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.confirm .inp{margin-bottom:10px}
+.error{min-height:18px;margin-top:8px;color:#ff9292;font-size:12px}
+.success{color:#86efac;font-size:13px;margin-top:12px;line-height:1.7}
+</style>
+
+<section class="panel">
+  <h2>Remove the app-update reward</h2>
+  <p class="hint">
+    New reward claims are disabled. This action processes each existing build-2 reward once,
+    records an audit entry, and can safely be run again without charging the same claim twice.
+  </p>
+  <div class="warning">
+    Only the remaining balance in the reward's original bucket is removed, up to ₹10 per claim.
+    Older claims without a recorded bucket are treated as bonus balance; migrated claims use
+    their recorded deposit bucket. Spent funds are not taken from other wallet buckets and no
+    wallet can become negative. Any unrecovered amount will be reported below.
+  </div>
+  <div class="confirm">
+    <label for="rewardConfirmation">Type REMOVE APP REWARDS exactly to confirm</label>
+    <input class="inp" id="rewardConfirmation" autocomplete="off" spellcheck="false">
+    <button class="btn primary" type="button" id="removeRewards">Remove remaining rewards</button>
+  </div>
+  <p class="error" id="rewardError" role="alert"></p>
+  <p class="success" id="rewardResult" role="status"></p>
+</section>
+
+<script>
+(function () {
+  var input = document.getElementById('rewardConfirmation');
+  var button = document.getElementById('removeRewards');
+  var error = document.getElementById('rewardError');
+  var result = document.getElementById('rewardResult');
+  var busy = false;
+
+  button.addEventListener('click', function () {
+    if (busy) return;
+    error.textContent = '';
+    result.textContent = '';
+    if (input.value !== 'REMOVE APP REWARDS') {
+      error.textContent = 'The confirmation phrase must match exactly.';
+      return;
+    }
+    if (!window.confirm(
+      'Remove any remaining unspent build-2 update rewards? This will not create negative balances.'
+    )) return;
+    busy = true;
+    button.disabled = true;
+    window.api('/remove-app-bonus/run', {
+      confirmation: input.value
+    }).then(function (response) {
+      busy = false;
+      button.disabled = false;
+      if (!response.ok) {
+        error.textContent = response.error || 'Could not remove the app-update rewards.';
+        return;
+      }
+      result.textContent =
+        'Completed. Claims processed: ' + response.accountsProcessed +
+        '; accounts with funds removed: ' + response.accountsWithBalance +
+        '; rupees removed: ₹' + response.amountRemoved +
+        '; rupees unavailable because already spent or missing: ₹' +
+        response.amountUnavailable + '.';
+    });
+  });
+})();
+</script>
+{% endblock %}

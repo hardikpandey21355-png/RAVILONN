@@ -37,6 +37,7 @@ from app.services.admin_service import (
     list_wallet_credits,
     list_withdrawals,
     player_account_details,
+    revoke_app_update_bonuses,
     save_tournament_results,
     settle_withdrawal,
     set_account_hold,
@@ -332,6 +333,32 @@ def check_edit():
 @app.get("/remove-data")
 def remove_data():
     return render_page("remove_data.html", "remove_data")
+
+
+@app.get("/remove-app-bonus")
+def remove_app_bonus():
+    return render_page("remove_app_bonus.html", "remove_app_bonus")
+
+
+@app.post("/remove-app-bonus/run")
+def remove_app_bonus_run():
+    body, error = _admin_json_body()
+    if error:
+        return error
+    if _string_field(body, "confirmation") != "REMOVE APP REWARDS":
+        return jsonify(
+            {
+                "ok": False,
+                "error": 'Type "REMOVE APP REWARDS" exactly to confirm.',
+            }
+        ), 400
+    try:
+        result = revoke_app_update_bonuses(
+            admin_uid=session.get("admin_uid", "local-admin"),
+        )
+    except AdminOperationError as exception:
+        return jsonify({"ok": False, "error": str(exception)}), 400
+    return jsonify({"ok": True, **result}), 200
 
 
 @app.post("/remove-data/search")
