@@ -19,14 +19,14 @@ $env:FIREBASE_PROJECT_ID = "ravilon-19a47"
 python run.py
 ```
 
-`python app.py` is also supported. No application data is written to SQLite or
-local files. Firebase ID-token verification uses Google's public signing keys.
+No application data is written to SQLite or local files. Firebase ID-token
+verification uses Google's public signing keys.
 
 ## Deploy the API to Vercel
 
 Import the repository into Vercel and set the project Root Directory to
 `backend`. Keep the Flask preset and default build/install settings. Vercel
-detects the Flask `app` in `app.py` and installs dependencies from
+detects the Flask `app` in `index.py` and installs dependencies from
 `requirements.txt`.
 
 Add these environment variables in Vercel Project Settings before deploying:
