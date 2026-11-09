@@ -196,8 +196,16 @@ class TournamentServiceTests(unittest.TestCase):
             },
         }
         db.data["tournamentEntries"] = {
-            "entry-upcoming": {"uid": "player-1", "tournamentId": "upcoming"},
-            "entry-completed": {"uid": "player-1", "tournamentId": "completed"},
+            "entry-upcoming": {
+                "uid": "player-1",
+                "tournamentId": "upcoming",
+                "slot": 7,
+            },
+            "entry-completed": {
+                "uid": "player-1",
+                "tournamentId": "completed",
+                "slot": 14,
+            },
             "entry-other": {"uid": "player-2", "tournamentId": "other-player-match"},
         }
         completed_result_id = hashlib.sha256(
@@ -218,6 +226,10 @@ class TournamentServiceTests(unittest.TestCase):
         )
         self.assertEqual(matches[1]["result"], {"declared": True, "won": 350})
         self.assertEqual(matches[1]["roomId"], "room-123")
+        self.assertEqual(
+            [match["mySlot"] for match in matches],
+            [7, 14],
+        )
 
     def test_create_and_reuse_default_persist_to_shared_collections(self) -> None:
         db = FakeFirestore()

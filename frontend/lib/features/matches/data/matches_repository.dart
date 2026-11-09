@@ -58,6 +58,9 @@ class MatchesRepository {
       fee: _integer(item['fee']),
       joined: _integer(item['joined']),
       slots: _integer(item['slots']),
+      mySlot: item['mySlot'] is int && (item['mySlot'] as int) > 0
+          ? item['mySlot'] as int
+          : null,
       perKill: _integer(item['perKill']),
       startsInSecs: startsIn,
       durationMin: duration,

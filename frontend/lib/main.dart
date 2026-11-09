@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'core/auth/auth_gate.dart';
 import 'core/auth/auth_repository.dart';
 import 'core/auth/auth_session.dart';
+import 'core/app_update/app_update_service.dart';
 import 'core/notifications/app_notifications.dart';
 import 'core/payment_deep_links.dart';
 import 'core/slide_route.dart';
@@ -185,6 +186,9 @@ class RivalonApp extends StatelessWidget {
             _tournamentContent(
               (context, records) => HomePage(
                 onSaveGameId: ProfileRepository().saveGameId,
+                onOpenTournament: (id) =>
+                    Navigator.of(context).pushNamed('/tournament/$id'),
+                onAppOpened: AppUpdateService().checkOnOpen,
                 onTournamentTimerEnd: () => unawaited(
                   _tournaments.refresh().catchError(
                     (Object _) => _tournaments.cached,

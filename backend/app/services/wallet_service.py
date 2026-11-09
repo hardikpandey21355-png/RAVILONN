@@ -129,6 +129,54 @@ def credit(
     return run_transaction(db, operation)
 
 
+def claim_app_update_bonus(
+    uid: str,
+    build_number: int,
+    *,
+    campaign_build_number: int,
+    enabled: bool,
+    db: Any = None,
+) -> bool:
+    if not enabled or build_number < campaign_build_number:
+        return False
+
+    database = db or get_db()
+    claim_ref = (
+        database.collection("users")
+        .document(uid)
+        .collection("appUpdateRewards")
+        .document(f"build_{campaign_build_number}")
+    )
+
+    def operation(tx: Any) -> bool:
+        if claim_ref.get(transaction=tx).exists:
+            return False
+        _ensure_not_held(database, uid, tx)
+        apply(
+            uid,
+            {
+                "deltas": {"bonus": 10},
+                "kind": "app_update_bonus",
+                "title": "APK update bonus",
+                "amt": 10,
+                "dir": "in",
+                "status": "paid",
+                "ref": f"apk-update-build-{campaign_build_number}",
+            },
+            tx,
+        )
+        tx.create(
+            claim_ref,
+            {
+                "buildNumber": campaign_build_number,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+            },
+        )
+        return True
+
+    return run_transaction(database, operation)
+
+
 def wallet_for(uid: str, db: Any = None) -> dict[str, int]:
     database = db or get_db()
     snapshot = database.collection("wallets").document(uid).get()

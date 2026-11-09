@@ -32,6 +32,7 @@ void main() {
           'fee': 20,
           'joined': 8,
           'slots': 24,
+          'mySlot': 12,
           'perKill': 5,
           'prize': 500,
           'durationMin': 25,
@@ -50,6 +51,7 @@ void main() {
     expect(api.requestedPath, '/api/matches');
     expect(matches, hasLength(1));
     expect(matches.single.tournamentId, 'complete-1');
+    expect(matches.single.mySlot, 12);
     expect(matches.single.startsInSecs, -1501);
     expect(matches.single.room?.roomId, 'room-123');
     expect(matches.single.result?.declared, isTrue);

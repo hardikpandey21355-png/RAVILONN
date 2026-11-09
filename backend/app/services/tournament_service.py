@@ -208,6 +208,7 @@ def joined_matches(uid: str, db: Any = None) -> list[dict[str, Any]]:
             {
                 "id": f"match_{tournament_id}",
                 "tournamentId": tournament_id,
+                "mySlot": _safe_int(entry_value.get("slot"), 0),
                 "mode": tournament.get("mode", ""),
                 "team": tournament.get("team", ""),
                 "map": tournament.get("map", ""),

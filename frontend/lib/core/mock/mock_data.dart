@@ -10,6 +10,7 @@ const String kPlayerName = 'Player';
 class HeroSlide {
   const HeroSlide({
     required this.tournament,
+    this.tournamentId,
     this.live = false,
     this.game = '',
     required this.mode,
@@ -24,6 +25,7 @@ class HeroSlide {
     required this.img,
   });
   final bool tournament;
+  final String? tournamentId;
   final bool live;
   final String game;
   final String mode;

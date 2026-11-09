@@ -26,6 +26,7 @@ class MatchItem {
     this.perKill = 0,
     required this.startsInSecs,
     this.tournamentId,
+    this.mySlot,
     this.durationMin = 25,
     this.room,
     this.result,
@@ -38,6 +39,7 @@ class MatchItem {
   /// Seconds from the moment the page opens. Negative = already started.
   final int startsInSecs;
   final String? tournamentId;
+  final int? mySlot;
   final int durationMin;
   final MatchRoom? room;
   final MatchResult? result;

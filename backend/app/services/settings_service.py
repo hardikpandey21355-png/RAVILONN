@@ -14,6 +14,19 @@ DEFAULT_SETTINGS = {
     "maintenance": False,
     "maintenanceMessage": "We will be back shortly.",
     "maintenanceEta": "",
+    "appUpdateEnabled": True,
+    "appLatestVersionCode": 2,
+    "appLatestVersionName": "1.1.0",
+    "appDownloadUrl": (
+        "https://github.com/hardikpandey21355-png/"
+        "Rival-on-website/raw/refs/heads/main/Ravilon.apk"
+    ),
+    "appUpdateMessage": (
+        "Update karke ₹10 bonus paayein aur tournament mein real cash "
+        "jeetne ka mauka paayein."
+    ),
+    "appBonusEnabled": True,
+    "appBonusBuildNumber": 2,
 }
 
 

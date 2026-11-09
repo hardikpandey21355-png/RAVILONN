@@ -97,6 +97,38 @@ void main() {
     expect(find.text('Finished Match'), findsNothing);
   });
 
+  testWidgets('tapping a tournament hero opens that tournament', (tester) async {
+    String? openedTournament;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomePage(
+          tournaments: [
+            Tournament(
+              id: 'hero-tournament',
+              game: 'Free Fire',
+              mode: 'Featured Match',
+              detail: 'Solo | Bermuda',
+              status: 'upcoming',
+              prize: '₹250',
+              fee: '₹10',
+              players: '0/24',
+              when: 'Today',
+              secs: 3600,
+              label: 'Starts in',
+              bg: 'main_banner.jpg',
+            ),
+          ],
+          onOpenTournament: (id) => openedTournament = id,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Featured Match').first);
+    await tester.pump();
+
+    expect(openedTournament, 'hero-tournament');
+  });
+
   testWidgets('loot tournaments never appear in the home hero slider', (
     tester,
   ) async {

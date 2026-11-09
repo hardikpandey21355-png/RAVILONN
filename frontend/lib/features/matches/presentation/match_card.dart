@@ -756,6 +756,11 @@ class _MatchCardState extends State<MatchCard> {
                 overflow: TextOverflow.ellipsis,
                 style: _t(11, FontWeight.w400, const Color(0xFFC4D3CE)),
               ),
+              if (m.mySlot != null)
+                Text(
+                  'YOUR SLOT #${m.mySlot}',
+                  style: _t(10, FontWeight.w600, const Color(0xFF6EE6C3)),
+                ),
             ],
           ),
         ),

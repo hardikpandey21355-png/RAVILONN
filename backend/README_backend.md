@@ -47,6 +47,27 @@ payment callbacks before switching the APK's API URL or disabling the Render
 service. Update the TranZUPI webhook URL to
 `https://<deployment-domain>/api/payments/tranzupi/webhook` when switching.
 
+## Mobile app updates
+
+The authenticated `GET /api/app-update` endpoint provides the latest Android
+version and download URL. Builds that include the update checker show an
+optional Update / Skip prompt only when the configured version code is newer.
+The authenticated `POST /api/app-update/claim` endpoint grants the one-time
+₹10 bonus to the bonus wallet bucket for eligible builds. A Firestore
+transaction prevents an account from claiming the same campaign twice.
+
+These settings are read from `settings/app` and fall back to the defaults in
+`settings_service.py`:
+
+- `appUpdateEnabled`, `appLatestVersionCode`, `appLatestVersionName`,
+  `appDownloadUrl`, and `appUpdateMessage` control the update prompt.
+- `appBonusEnabled` and `appBonusBuildNumber` control the one-time bonus
+  campaign.
+
+Deploy the backend update before distributing the APK. Existing APKs that do
+not contain the update checker cannot display the prompt; announce the release
+to those users through the Admin Notifications page.
+
 ## Endpoints
 
 All `/api` endpoints require a Firebase ID token in the `Authorization: Bearer`
@@ -56,6 +77,9 @@ the JSON `idToken` property.
 - `POST /api/auth/login`: create/refresh the Firestore user profile; return
   profile, wallet, `hasUpi`, `dailyLeft`, and wallet `limits`.
 - `GET /api/me`: return the signed-in user session and wallet summary.
+- `GET /api/app-update`: return Android update metadata.
+- `POST /api/app-update/claim`: atomically credit the eligible account's
+  one-time APK update bonus.
 - `GET /api/tournaments`: return scheduled normal and loot tournaments to the
   authenticated player app.
 - `GET /api/wallet`: wallet balances, UPI state, today's remaining withdrawal

@@ -39,7 +39,12 @@ from app.services.tournament_service import (
     slots_for_tournament,
 )
 from app.services.user_service import AccountOnHold, get_or_create_user
-from app.services.wallet_service import InsufficientFunds, apply, wallet_for
+from app.services.wallet_service import (
+    InsufficientFunds,
+    apply,
+    claim_app_update_bonus,
+    wallet_for,
+)
 
 
 api = Blueprint("api", __name__)
@@ -184,6 +189,81 @@ def app_status() -> tuple[Any, int]:
         return held_error()
     return jsonify(
         {"ok": True, "maintenance": maintenance_info(get_settings())}
+    ), 200
+
+
+@api.get("/api/app-update")
+@require_auth
+def app_update_info() -> tuple[Any, int]:
+    user, error = _require_user()
+    if error:
+        return error
+    if _is_held(user or {}):
+        return held_error()
+
+    settings = get_settings()
+    version_code = settings["appLatestVersionCode"]
+    if isinstance(version_code, bool) or not isinstance(version_code, int):
+        version_code = 2
+    version_name = settings["appLatestVersionName"]
+    if not isinstance(version_name, str):
+        version_name = "1.1.0"
+    download_url = settings["appDownloadUrl"]
+    if not isinstance(download_url, str):
+        download_url = ""
+    message = settings["appUpdateMessage"]
+    if not isinstance(message, str):
+        message = "A new Ravilon update is available."
+
+    return jsonify(
+        {
+            "ok": True,
+            "enabled": settings["appUpdateEnabled"] is True,
+            "latestBuildNumber": version_code,
+            "latestVersionName": version_name,
+            "downloadUrl": download_url,
+            "message": message,
+        }
+    ), 200
+
+
+@api.post("/api/app-update/claim")
+@require_auth
+def claim_app_update_reward() -> tuple[Any, int]:
+    user, error = _require_user()
+    if error:
+        return error
+    if _is_held(user or {}):
+        return held_error()
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return api_error("Request body must be valid JSON.", 400)
+    build_number = body.get("buildNumber")
+    if isinstance(build_number, bool) or not isinstance(build_number, int):
+        return api_error("App build number must be an integer.", 400)
+
+    settings = get_settings()
+    campaign_build = settings["appBonusBuildNumber"]
+    if isinstance(campaign_build, bool) or not isinstance(campaign_build, int):
+        campaign_build = 2
+    try:
+        credited = claim_app_update_bonus(
+            g.uid,
+            build_number,
+            campaign_build_number=campaign_build,
+            enabled=settings["appBonusEnabled"] is True,
+        )
+    except AccountOnHold:
+        return held_error()
+
+    return jsonify(
+        {
+            "ok": True,
+            "credited": credited,
+            "amount": 10 if credited else 0,
+            "wallet": wallet_for(g.uid),
+        }
     ), 200
 
 

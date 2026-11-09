@@ -18,11 +18,15 @@ class HomePage extends StatefulWidget {
     super.key,
     this.onSaveGameId,
     this.onTournamentTimerEnd,
+    this.onOpenTournament,
+    this.onAppOpened,
     this.tournaments,
   });
 
   final Future<GameIdResult> Function(String ign, String uid)? onSaveGameId;
   final VoidCallback? onTournamentTimerEnd;
+  final void Function(String tournamentId)? onOpenTournament;
+  final Future<void> Function(BuildContext context)? onAppOpened;
   final List<Tournament>? tournaments;
   @override
   State<HomePage> createState() => _HomePageState();
@@ -38,6 +42,12 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final onAppOpened = widget.onAppOpened;
+      if (mounted && onAppOpened != null) {
+        unawaited(onAppOpened(context));
+      }
+    });
     _slides = _buildHeroSlides(widget.tournaments ?? const <Tournament>[]);
     _left = ValueNotifier<List<int>>(
       _slides.map((slide) => slide.secs).toList(),
@@ -95,6 +105,7 @@ class _HomePageState extends State<HomePage> {
           final live = tournament.status == 'live';
           return HeroSlide(
             tournament: true,
+            tournamentId: tournament.id,
             live: live,
             game: tournament.game,
             mode: tournament.mode,
@@ -158,7 +169,12 @@ class _HomePageState extends State<HomePage> {
                   RsIn(
                     delay: .08,
                     child: _pad(
-                      _Hero(slides: _slides, left: _left, index: _slideIdx),
+                      _Hero(
+                        slides: _slides,
+                        left: _left,
+                        index: _slideIdx,
+                        onOpenTournament: widget.onOpenTournament,
+                      ),
                       top: 16,
                     ),
                   ),
@@ -438,10 +454,16 @@ class _HomePageState extends State<HomePage> {
 // HERO carousel
 // =============================================================================
 class _Hero extends StatefulWidget {
-  const _Hero({required this.slides, required this.left, required this.index});
+  const _Hero({
+    required this.slides,
+    required this.left,
+    required this.index,
+    this.onOpenTournament,
+  });
   final List<HeroSlide> slides;
   final ValueNotifier<List<int>> left;
   final ValueNotifier<int> index;
+  final void Function(String tournamentId)? onOpenTournament;
   @override
   State<_Hero> createState() => _HeroState();
 }
@@ -567,11 +589,18 @@ class _HeroState extends State<_Hero> with WidgetsBindingObserver {
               controller: _pc,
               itemCount: _n + 1,
               onPageChanged: (i) => widget.index.value = i % _n,
-              itemBuilder: (context, i) => _Slide(
-                s: widget.slides[i % _n],
-                idx: i % _n,
-                left: widget.left,
-              ),
+              itemBuilder: (context, i) {
+                final slide = widget.slides[i % _n];
+                final tournamentId = slide.tournamentId;
+                return _Slide(
+                  s: slide,
+                  idx: i % _n,
+                  left: widget.left,
+                  onTap: tournamentId == null
+                      ? null
+                      : () => widget.onOpenTournament?.call(tournamentId),
+                );
+              },
             ),
           ),
         ),
@@ -588,79 +617,92 @@ class _HeroState extends State<_Hero> with WidgetsBindingObserver {
 }
 
 class _Slide extends StatelessWidget {
-  const _Slide({required this.s, required this.idx, required this.left});
+  const _Slide({
+    required this.s,
+    required this.idx,
+    required this.left,
+    this.onTap,
+  });
   final HeroSlide s;
   final int idx;
   final ValueNotifier<List<int>> left;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        const ColoredBox(color: Color(0xFF0A0A0A)),
-        if (s.bannerUrl.isNotEmpty)
-          Image.network(
-            s.bannerUrl,
-            fit: BoxFit.cover,
-            alignment: Alignment.centerRight,
-            errorBuilder: (_, _, _) =>
-                RsImage(s.img, alignment: Alignment.centerRight),
-          )
-        else
-          RsImage(s.img, alignment: Alignment.centerRight),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [rsK(.88), rsK(.45), rsK(.05)],
-              stops: const [0, .55, 1],
-            ),
-          ),
-        ),
-        Positioned(
-          top: 14,
-          left: 14,
-          right: 14,
-          child: s.tournament ? _tournamentTop(context) : _promoTop(context),
-        ),
-        Positioned(
-          top: 12,
-          right: 12,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const ColoredBox(color: Color(0xFF0A0A0A)),
+          if (s.bannerUrl.isNotEmpty)
+            Image.network(
+              s.bannerUrl,
+              fit: BoxFit.cover,
+              alignment: Alignment.centerRight,
+              errorBuilder: (_, _, _) =>
+                  RsImage(s.img, alignment: Alignment.centerRight),
+            )
+          else
+            RsImage(s.img, alignment: Alignment.centerRight),
+          DecoratedBox(
             decoration: BoxDecoration(
-              color: rsK(.4),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'FREE FIRE',
-                  style: rsT(12, w: FontWeight.w700, ls: 1, h: 1.2),
-                ),
-                Text(
-                  'GARENA',
-                  style: rsT(6, ls: 2, color: const Color(0xFFCBD0F0)),
-                ),
-              ],
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [rsK(.88), rsK(.45), rsK(.05)],
+                stops: const [0, .55, 1],
+              ),
             ),
           ),
-        ),
-        Positioned(
-          left: 14,
-          right: 14,
-          bottom: 14,
-          child: s.tournament
-              ? Align(alignment: Alignment.centerRight, child: _timer(context))
-              : Align(
-                  alignment: Alignment.centerLeft,
-                  child: _viewButton(context),
-                ),
-        ),
-      ],
+          Positioned(
+            top: 14,
+            left: 14,
+            right: 14,
+            child: s.tournament ? _tournamentTop(context) : _promoTop(context),
+          ),
+          Positioned(
+            top: 12,
+            right: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: rsK(.4),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'FREE FIRE',
+                    style: rsT(12, w: FontWeight.w700, ls: 1, h: 1.2),
+                  ),
+                  Text(
+                    'GARENA',
+                    style: rsT(6, ls: 2, color: const Color(0xFFCBD0F0)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 14,
+            right: 14,
+            bottom: 14,
+            child: s.tournament
+                ? Align(
+                    alignment: Alignment.centerRight,
+                    child: _timer(context),
+                  )
+                : Align(
+                    alignment: Alignment.centerLeft,
+                    child: _viewButton(context),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
