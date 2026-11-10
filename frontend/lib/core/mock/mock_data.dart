@@ -14,6 +14,7 @@ class HeroSlide {
     this.live = false,
     this.game = '',
     required this.mode,
+    this.team = '',
     this.prize = '',
     this.fee = '',
     this.players = '',
@@ -29,6 +30,7 @@ class HeroSlide {
   final bool live;
   final String game;
   final String mode;
+  final String team;
   final String prize;
   final String fee;
   final String players;
@@ -45,6 +47,7 @@ class Tournament {
     required this.id,
     required this.game,
     required this.mode,
+    this.team = '',
     required this.detail,
     required this.status,
     this.logo = 'ff',
@@ -66,6 +69,7 @@ class Tournament {
   final String id;
   final String game;
   final String mode;
+  final String team;
   final String detail;
   final String status;
   final String logo; // 'ff' | 'cod'
@@ -84,6 +88,8 @@ class Tournament {
   final String roomId;
   final String roomPass;
   String get img => bg;
+  String get teamType =>
+      team.isNotEmpty ? team : detail.split('|').first.trim();
 }
 
 class MockData {

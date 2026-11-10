@@ -339,6 +339,22 @@ class RivalonApp extends StatelessWidget {
                       (route) => false,
                     );
                   },
+                  onDeleteAccount: () async {
+                    _tournaments.stopPolling();
+                    await AuthRepository().deleteAccount();
+                    final preferences = await SharedPreferences.getInstance();
+                    await preferences.remove('rs_intro_seen');
+                    final navigator = _navigatorKey.currentState;
+                    if (navigator == null) {
+                      throw StateError(
+                        'Navigator is not ready after account deletion.',
+                      );
+                    }
+                    navigator.pushNamedAndRemoveUntil(
+                      '/login',
+                      (route) => false,
+                    );
+                  },
                   bottomInset: const EdgeInsets.only(bottom: 100),
                 ),
               ),
@@ -704,7 +720,9 @@ TournamentDetail _toTournamentDetail(Tournament tournament) {
     id: tournament.id,
     game: tournament.game,
     mode: tournament.mode,
-    team: detailParts.isNotEmpty && detailParts.first.isNotEmpty
+    team: tournament.teamType.isNotEmpty
+        ? tournament.teamType
+        : detailParts.isNotEmpty && detailParts.first.isNotEmpty
         ? detailParts.first
         : defaults.team,
     map: detailParts.length > 1 && detailParts[1].isNotEmpty

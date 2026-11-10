@@ -55,7 +55,7 @@ class AppUpdateApiTests(unittest.TestCase):
                 "ok": True,
                 "enabled": True,
                 "forceUpdate": True,
-                "latestBuildNumber": 4,
+                "latestBuildNumber": 8,
                 "latestVersionName": "1.1.0",
                 "downloadUrl": "https://example.com/Ravilon.apk",
                 "message": "App use karte rehne ke liye latest update install karein.",

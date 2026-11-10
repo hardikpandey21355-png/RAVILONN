@@ -50,7 +50,7 @@ service. Update the TranZUPI webhook URL to
 ## Mobile app updates
 
 The authenticated `GET /api/app-update` endpoint provides the latest Android
-version and download URL. The current release is build 4 (`1.1.0`); the backend
+version and download URL. The current release is build 8 (`1.1.0`); the backend
 sets `forceUpdate` for clients that support that flag. The authenticated
 `POST /api/app-update/claim` endpoint is retained for compatibility but cannot
 grant rewards. The Admin's `/app-bonus` section can revoke unspent build-2

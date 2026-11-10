@@ -5,7 +5,7 @@ from firebase_admin import firestore
 from app.core.firestore import get_db
 
 
-LATEST_APP_BUILD_NUMBER = 4
+LATEST_APP_BUILD_NUMBER = 8
 
 
 DEFAULT_SETTINGS = {

@@ -109,6 +109,7 @@ class _HomePageState extends State<HomePage> {
             live: live,
             game: tournament.game,
             mode: tournament.mode,
+            team: tournament.teamType,
             prize: tournament.prize,
             fee: tournament.fee,
             players: tournament.players,
@@ -730,6 +731,14 @@ class _Slide extends StatelessWidget {
             color: const Color(0xFFCBD0F0),
           ),
         ),
+        if (s.team.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          _Pill(
+            label: '${s.team.toUpperCase()} MATCH',
+            dot: kRsCyan,
+            blink: false,
+          ),
+        ],
         const SizedBox(height: 10),
         Wrap(
           spacing: 10,

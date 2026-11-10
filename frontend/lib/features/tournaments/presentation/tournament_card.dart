@@ -131,6 +131,23 @@ class TournamentCardView extends StatelessWidget {
           ),
         ),
         Positioned(top: 8, left: 8, child: _statusTag()),
+        if (card.teamType.isNotEmpty)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: rsC(8, 14, 13, .78),
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(color: rsC(255, 255, 255, .28)),
+              ),
+              child: Text(
+                card.teamType.toUpperCase(),
+                style: _t(9, FontWeight.w700, Colors.white),
+              ),
+            ),
+          ),
         Positioned(
           left: 10,
           right: 6,

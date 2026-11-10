@@ -49,6 +49,11 @@ class TournamentDetail {
   final bool loot;
 
   bool get isLive => status == 'live';
+  int get teamSize => switch (team) {
+    'Duo' => 2,
+    'Squad' => 4,
+    _ => 1,
+  };
   bool get full => joinedCount >= slots;
   bool get hasPerKill => (perKill ?? 0) > 0;
 

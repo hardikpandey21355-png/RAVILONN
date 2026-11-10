@@ -34,13 +34,22 @@ void main() {
 
     await tester.tap(find.text('Join Now • ₹10'));
     await tester.pumpAndSettle();
+    expect(tester.state<JoinSheetState>(find.byType(JoinSheet)).isOpen, isTrue);
     final slotOne = find.descendant(
       of: find.byType(SlotGrid),
       matching: find.text('1'),
     );
     await tester.tap(slotOne);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Confirm Slot 1 • ₹10'));
+    expect(tester.state<JoinSheetState>(find.byType(JoinSheet)).isOpen, isTrue);
+    final confirm = find.text('Confirm Slot 1 • ₹10');
+    final cancel = find.text('Cancel');
+    expect(confirm, findsOneWidget);
+    expect(cancel, findsOneWidget);
+    final actionBottom = tester.getRect(cancel).bottom;
+    expect(actionBottom, lessThanOrEqualTo(tester.view.physicalSize.height /
+        tester.view.devicePixelRatio));
+    await tester.tap(confirm);
     await tester.pump(const Duration(milliseconds: 900));
 
     expect(MockData.walletBalance.value, 1240);

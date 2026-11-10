@@ -58,6 +58,7 @@ class JoinSheetState extends State<JoinSheet> {
 
   final TextEditingController _amt = TextEditingController();
   final FocusNode _amtFocus = FocusNode();
+  final ScrollController _sheetScroll = ScrollController();
   Timer? _hideTimer;
   Timer? _joinedTimer;
 
@@ -78,6 +79,7 @@ class JoinSheetState extends State<JoinSheet> {
     _amtFocus.removeListener(_rebuild);
     _amt.dispose();
     _amtFocus.dispose();
+    _sheetScroll.dispose();
     super.dispose();
   }
 
@@ -146,7 +148,9 @@ class JoinSheetState extends State<JoinSheet> {
     });
     SlotsResult res;
     try {
-      res = await (widget.onLoadSlots ?? () => TournamentDetailMock.loadSlots(widget.t))();
+      res =
+          await (widget.onLoadSlots ??
+              () => TournamentDetailMock.loadSlots(widget.t))();
     } catch (e) {
       debugPrint('JoinSheet: loading slots failed ($e)');
       res = const SlotsResult(ok: false);
@@ -165,11 +169,25 @@ class JoinSheetState extends State<JoinSheet> {
   }
 
   void _pick(int n) {
+    final teamNumber = (n - 1) ~/ widget.t.teamSize + 1;
     setState(() {
       _picked = n;
       _goDisabled = false;
-      _goLabel = 'Confirm Slot $n • ₹${_inr(widget.t.fee)}';
+      _goLabel = widget.t.teamSize == 1
+          ? 'Confirm Slot $n • ₹${_inr(widget.t.fee)}'
+          : 'Confirm Team $teamNumber · Slot $n • ₹${_inr(widget.t.fee)}';
       _err = '';
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sheetScroll.hasClients) return;
+      final position = _sheetScroll.position;
+      if (position.maxScrollExtent > 0) {
+        _sheetScroll.animateTo(
+          position.maxScrollExtent,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -258,7 +276,8 @@ class JoinSheetState extends State<JoinSheet> {
     }
     close();
     widget.toast(
-        'Payment sent for approval. You can join once your wallet is updated.');
+      'Payment sent for approval. You can join once your wallet is updated.',
+    );
   }
 
   // ---- build ----
@@ -308,6 +327,7 @@ class JoinSheetState extends State<JoinSheet> {
             loading: _loading,
             failed: _failed,
             slots: _slotCount,
+            teamSize: widget.t.teamSize,
             taken: _taken,
             picked: _picked,
             loot: loot,
@@ -317,8 +337,10 @@ class JoinSheetState extends State<JoinSheet> {
         Container(
           constraints: const BoxConstraints(minHeight: 18),
           margin: const EdgeInsets.symmetric(vertical: 6),
-          child: Text(_err,
-              style: _t(12, FontWeight.w400, const Color(0xFFF87171), h: 1.5)),
+          child: Text(
+            _err,
+            style: _t(12, FontWeight.w400, const Color(0xFFF87171), h: 1.5),
+          ),
         ),
         Padding(
           padding: const EdgeInsets.only(top: 8),
@@ -368,8 +390,7 @@ class JoinSheetState extends State<JoinSheet> {
                   child: AnimatedContainer(
                     duration: _ms(context, 250),
                     curve: Curves.ease,
-                    transform:
-                        Matrix4.translationValues(0, _open ? 0 : 40, 0),
+                    transform: Matrix4.translationValues(0, _open ? 0 : 40, 0),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () {},
@@ -377,24 +398,33 @@ class JoinSheetState extends State<JoinSheet> {
                         decoration: const BoxDecoration(
                           color: Color(0xFF0D0D0D),
                           borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(24)),
+                            top: Radius.circular(24),
+                          ),
                           border: Border(
                             top: BorderSide(color: Color(0xFF2A2A2A), width: 1),
-                            left: BorderSide(color: Color(0xFF2A2A2A), width: 1),
-                            right:
-                                BorderSide(color: Color(0xFF2A2A2A), width: 1),
+                            left: BorderSide(
+                              color: Color(0xFF2A2A2A),
+                              width: 1,
+                            ),
+                            right: BorderSide(
+                              color: Color(0xFF2A2A2A),
+                              width: 1,
+                            ),
                           ),
                         ),
                         child: Material(
                           type: MaterialType.transparency,
                           child: SingleChildScrollView(
+                            controller: _sheetScroll,
                             padding: EdgeInsets.fromLTRB(
                               16,
                               18,
                               16,
                               18 +
-                                  math.max(mq.padding.bottom,
-                                      mq.viewInsets.bottom),
+                                  math.max(
+                                    mq.padding.bottom,
+                                    mq.viewInsets.bottom,
+                                  ),
                             ),
                             child: panelBody,
                           ),
@@ -449,8 +479,7 @@ class JoinSheetState extends State<JoinSheet> {
       ),
       child: Row(
         children: <Widget>[
-          Text('₹',
-              style: _t(17, FontWeight.w600, const Color(0xFFCBD0F0))),
+          Text('₹', style: _t(17, FontWeight.w600, const Color(0xFFCBD0F0))),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -489,7 +518,9 @@ class JoinSheetState extends State<JoinSheet> {
             decoration: BoxDecoration(
               color: bg,
               borderRadius: BorderRadius.circular(3),
-              border: border == null ? null : Border.all(color: border, width: 1),
+              border: border == null
+                  ? null
+                  : Border.all(color: border, width: 1),
             ),
           ),
           const SizedBox(width: 5),

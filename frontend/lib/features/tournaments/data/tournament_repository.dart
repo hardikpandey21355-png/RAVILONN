@@ -150,11 +150,14 @@ class TournamentRepository extends WidgetsBindingObserver {
         }
         taken.add(slot);
       }
-      return SlotsResult(
-        ok: true,
-        slots: response['slots'] as int,
-        taken: taken,
-      );
+      final tournament = find(tournamentId);
+      final teamSize = tournament == null ? 1 : _teamSize(tournament.team);
+      final slots = response['playerSlots'] is int
+          ? response['playerSlots'] as int
+          : response['teamSlots'] is int
+          ? (response['teamSlots'] as int) * teamSize
+          : (response['slots'] as int) * teamSize;
+      return SlotsResult(ok: true, slots: slots, taken: taken);
     } on ApiAuthException catch (error) {
       return SlotsResult(ok: false, error: error.message);
     }
@@ -263,9 +266,7 @@ class TournamentRepository extends WidgetsBindingObserver {
     _observedUserId = userId;
     _requestGeneration++;
     _inFlight = null;
-    _cached = List<Tournament>.unmodifiable(
-      _mockItems ?? const <Tournament>[],
-    );
+    _cached = List<Tournament>.unmodifiable(_mockItems ?? const <Tournament>[]);
     tournaments.value = _cached;
     MockData.clearAccountScopedState();
     hasLoaded = _mockItems != null;
@@ -281,6 +282,7 @@ class TournamentRepository extends WidgetsBindingObserver {
     final mode = _text(item['mode'], 'Tournament');
     final team = _text(item['team'], 'Solo');
     final map = _text(item['map'], '');
+    final teamSize = _teamSize(team);
     final fee = _integer(item['fee']);
     final perKill = _integer(item['per_kill'] ?? item['perKill']);
     final prizes = item['prizes'];
@@ -288,12 +290,14 @@ class TournamentRepository extends WidgetsBindingObserver {
       id: _text(item['id'], ''),
       game: _text(item['game'], 'Free Fire'),
       mode: mode,
+      team: team,
       detail: '$team | $map',
       status: _text(item['status'], 'upcoming'),
       logo: 'ff',
       prize: '₹${inr(_integer(item['prize']))}',
       fee: '₹${inr(fee)}',
-      players: '${_integer(item['joined'])}/${_integer(item['slots'])}',
+      players:
+          '${_integer(item['joined'])}/${_integer(item['playerSlots']) > 0 ? _integer(item['playerSlots']) : _integer(item['slots']) * teamSize}',
       perKill: perKill > 0 ? '₹${inr(perKill)}' : null,
       when: _text(item['when'], ''),
       secs: _integer(item['secs']),
@@ -341,7 +345,9 @@ class TournamentRepository extends WidgetsBindingObserver {
       id: tournament.id,
       game: tournament.game,
       mode: tournament.mode,
-      team: details.isNotEmpty && details.first.isNotEmpty
+      team: tournament.teamType.isNotEmpty
+          ? tournament.teamType
+          : details.isNotEmpty && details.first.isNotEmpty
           ? details.first
           : defaults.team,
       map: details.length > 1 ? details[1] : defaults.map,
@@ -350,7 +356,9 @@ class TournamentRepository extends WidgetsBindingObserver {
       prize: number(tournament.prize),
       fee: number(tournament.fee),
       perKill: tournament.perKill == null ? null : number(tournament.perKill!),
-      slots: counts.length > 1 ? number(counts.last) : defaults.slots,
+      slots: counts.length > 1
+          ? number(counts.last)
+          : defaults.slots * _teamSize(tournament.team),
       joinedCount: counts.isEmpty ? defaults.joinedCount : number(counts.first),
       secs: tournament.secs,
       label: tournament.label,
@@ -366,6 +374,12 @@ class TournamentRepository extends WidgetsBindingObserver {
     if (value is String) return int.tryParse(value) ?? 0;
     return 0;
   }
+
+  int _teamSize(String team) => switch (team) {
+    'Duo' => 2,
+    'Squad' => 4,
+    _ => 1,
+  };
 
   String _text(dynamic value, String fallback) =>
       value is String ? value : fallback;

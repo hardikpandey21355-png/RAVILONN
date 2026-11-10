@@ -3,7 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../auth/api_client.dart';
 
-const int currentAppBuildNumber = 4;
+const int currentAppBuildNumber = 8;
 
 class AppUpdateService {
   AppUpdateService({ApiClient? apiClient})

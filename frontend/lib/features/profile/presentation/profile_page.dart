@@ -92,6 +92,7 @@ class ProfilePage extends StatefulWidget {
     this.onOpenWallet,
     this.onOpenNotifications,
     this.onLogout,
+    this.onDeleteAccount,
     this.bottomInset = const EdgeInsets.only(bottom: 100),
   });
 
@@ -119,6 +120,7 @@ class ProfilePage extends StatefulWidget {
   final VoidCallback? onOpenWallet;
   final VoidCallback? onOpenNotifications;
   final Future<void> Function()? onLogout;
+  final Future<void> Function()? onDeleteAccount;
   final EdgeInsets bottomInset;
 
   @override
@@ -316,6 +318,62 @@ class _ProfilePageState extends State<ProfilePage>
           );
         }
       }
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final off = MediaQuery.disableAnimationsOf(context);
+    final confirmed = await showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Cancel',
+      barrierColor: _c(0, 0, 0, .72),
+      transitionDuration: off
+          ? Duration.zero
+          : const Duration(milliseconds: 300),
+      pageBuilder: (_, _, _) => const _DeleteAccountDialog(),
+      transitionBuilder: (_, animation, _, child) {
+        final value = _ease.transform(animation.value);
+        return Opacity(
+          opacity: value,
+          child: Transform.scale(scale: .94 + .06 * value, child: child),
+        );
+      },
+    );
+    if (!mounted || confirmed != true) return;
+    final deleteAccount = widget.onDeleteAccount;
+    if (deleteAccount == null) {
+      ProfileToast.show(
+        context,
+        'Could not delete account',
+        ProfileToastType.err,
+        'Please try again later.',
+      );
+      return;
+    }
+
+    unawaited(
+      showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierLabel: 'Deleting account',
+        barrierColor: _c(0, 0, 0, .72),
+        pageBuilder: (_, _, _) => const _DeletingAccountDialog(),
+      ),
+    );
+    final navigator = Navigator.of(context, rootNavigator: true);
+    try {
+      await deleteAccount();
+    } catch (error) {
+      debugPrint('ProfilePage: account deletion failed ($error)');
+      if (!mounted) return;
+      navigator.pop();
+      ProfileToast.show(
+        context,
+        'Could not delete account',
+        ProfileToastType.err,
+        error.toString(),
+      );
     }
   }
 
@@ -567,15 +625,26 @@ class _ProfilePageState extends State<ProfilePage>
                       ],
                     ),
                   ),
-                  // 13 logout
+                  // 13 account actions
                   _r(
                     12,
                     Padding(
                       padding: const EdgeInsets.only(top: 18),
-                      child: ProfileButton(
-                        label: 'Log out',
-                        kind: ProfileButtonKind.danger,
-                        onTap: _logout,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ProfileButton(
+                            label: 'Log out',
+                            kind: ProfileButtonKind.danger,
+                            onTap: _logout,
+                          ),
+                          const SizedBox(height: 10),
+                          ProfileButton(
+                            label: 'Delete account',
+                            kind: ProfileButtonKind.danger,
+                            onTap: _deleteAccount,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -724,6 +793,100 @@ class _LogoutDialog extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeleteAccountDialog extends StatelessWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: ProfileGlass(
+              radius: 24,
+              padding: const EdgeInsets.all(20),
+              base: _c(30, 8, 10, .97),
+              colors: [_c(255, 107, 107, .2), _c(255, 255, 255, .035)],
+              stops: const [0, 1],
+              angle: 180,
+              border: _c(255, 107, 107, .42),
+              hl: .1,
+              shadow: [
+                BoxShadow(
+                  color: _c(0, 0, 0, .6),
+                  blurRadius: 36,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Delete account permanently?',
+                    textAlign: TextAlign.center,
+                    style: _t(17, 700, Colors.white, h: 1.3),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Your profile, wallet, transactions, deposits, withdrawals, '
+                    'tournament history, and Firebase data will be permanently '
+                    'deleted. Resolve pending withdrawals first. This cannot be undone.',
+                    textAlign: TextAlign.center,
+                    style: _t(12, 400, _c(255, 220, 220), h: 1.5),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ProfileButton(
+                          label: 'Cancel',
+                          kind: ProfileButtonKind.ghost,
+                          height: 46,
+                          onTap: () => Navigator.of(context).pop(false),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ProfileButton(
+                          label: 'Delete',
+                          kind: ProfileButtonKind.danger,
+                          height: 46,
+                          onTap: () => Navigator.of(context).pop(true),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeletingAccountDialog extends StatelessWidget {
+  const _DeletingAccountDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Material(
+      type: MaterialType.transparency,
+      child: Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFFFF6B6B),
+          semanticsLabel: 'Deleting account and data',
         ),
       ),
     );

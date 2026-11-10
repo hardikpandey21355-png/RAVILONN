@@ -106,6 +106,22 @@ class AuthRepository {
     await _signOutFirebaseAndProvider();
   }
 
+  Future<void> deleteAccount() async {
+    await AppNotifications.unregisterCurrentDevice();
+    final response = await _apiClient.postJson(
+      '/api/account/delete',
+      body: const {},
+    );
+    if (response['ok'] != true) {
+      throw ApiAuthException(
+        message: response['error'] is String
+            ? response['error'] as String
+            : 'Could not delete the account. Please try again.',
+      );
+    }
+    await _signOutFirebaseAndProvider();
+  }
+
   Future<void> _finishSignIn(User? user) async {
     if (user == null) {
       throw const ApiAuthException(message: 'Authentication did not complete.');

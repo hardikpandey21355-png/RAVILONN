@@ -46,6 +46,7 @@ const String _pTicket =
     r'<path d="M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 1 0-6V6H3z"/><path d="M13 6v12" stroke-dasharray="2 2"/>';
 const String _pUsers =
     r'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>';
+const String _pHash = r'<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>';
 const String _pArrow = r'<path d="M9 5l7 7-7 7"/>';
 const String _pClock =
     r'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
@@ -756,11 +757,6 @@ class _MatchCardState extends State<MatchCard> {
                 overflow: TextOverflow.ellipsis,
                 style: _t(11, FontWeight.w400, const Color(0xFFC4D3CE)),
               ),
-              if (m.mySlot != null)
-                Text(
-                  'YOUR SLOT #${m.mySlot}',
-                  style: _t(10, FontWeight.w600, const Color(0xFF6EE6C3)),
-                ),
             ],
           ),
         ),
@@ -845,6 +841,14 @@ class _MatchCardState extends State<MatchCard> {
         label: 'Players',
         loot: _loot,
       ),
+      if (m.mySlot != null)
+        _Kv(
+          path: _pHash,
+          hex: _loot ? '#f7d774' : '#6ee6c3',
+          value: '${m.mySlot}',
+          label: 'Your Slot',
+          loot: _loot,
+        ),
       if (m.perKill > 0)
         _Kv(
           path: _pSwords,
