@@ -188,6 +188,9 @@ to be enabled, and its installation ID to be registered; inbox messages remain
 available in the app even if push delivery is unavailable.
 
 The tournament player list shows only occupied slots in ascending slot order.
+The Admin `slots` setting is a team count: Solo has one player seat per team,
+Duo has two, and Squad has four. Player-facing slot APIs expose the resulting
+individual seat capacity, and occupied seats are grouped by team in the APK.
 Deleting a tournament removes its entries and slot claims and refunds each
 joined player's entry fee to the deposited wallet balance with a Firestore
 ledger entry. In the APK, the home carousel shows only live tournaments while

@@ -33,7 +33,7 @@
     <td>{{ t.team }} • {{ t.map }}</td>
     <td>₹{{ t.prize }}</td>
     <td>₹{{ t.fee }}</td>
-    <td>{{ t.joined }} / {{ t.slots }}</td>
+    <td>{{ t.joined }} / {{ t.playerSlots }}</td>
     <td>{{ t.when if t.status == 'upcoming' else '' }}{{ ' (' ~ t.duration_min ~ ' min)' if t.status == 'live' }}</td>
     <td><span class="pill {{ t.status }}">{{ t.status|capitalize }}</span></td>
     <td style="display:flex;gap:8px">

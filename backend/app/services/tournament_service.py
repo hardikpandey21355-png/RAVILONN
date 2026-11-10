@@ -22,6 +22,7 @@ from app.services.wallet_service import (
 
 IST = ZoneInfo("Asia/Kolkata")
 TEAMS = {"Solo", "Duo", "Squad"}
+TEAM_SIZES = {"Solo": 1, "Duo": 2, "Squad": 4}
 MAX_PRIZES = 20
 MAX_BANNER_BYTES = 4 * 1024 * 1024
 MIME_EXTENSIONS = {
@@ -114,6 +115,8 @@ def slots_for_tournament(
     if not snapshot.exists:
         raise TournamentNotJoinable("Tournament was not found.")
     value = snapshot.to_dict() or {}
+    team_slots = _safe_int(value.get("slots"), 0)
+    team_size = _team_size(value.get("team"))
     entries = list(
         database.collection("tournamentEntries")
         .where("tournamentId", "==", tournament_id)
@@ -132,7 +135,9 @@ def slots_for_tournament(
         {},
     )
     return {
-        "slots": _safe_int(value.get("slots"), 0),
+        "slots": team_slots * team_size,
+        "teamSlots": team_slots,
+        "teamSize": team_size,
         "taken": taken,
         "joined": bool(mine),
         "mySlot": mine.get("slot"),
@@ -367,7 +372,9 @@ def join_tournament(
         presented = _present(tournament_id, tournament, now)
         if presented["status"] != "upcoming":
             raise TournamentNotJoinable("This tournament is no longer open for joining.")
-        slots = _safe_int(tournament.get("slots"), 0)
+        slots = _safe_int(tournament.get("slots"), 0) * _team_size(
+            tournament.get("team")
+        )
         if slot > slots:
             raise TournamentJoinError("Choose a valid slot.")
         if slot_snapshot.exists:
@@ -791,6 +798,8 @@ def _present(
         when = f"{date_label}, {local_start.strftime('%I:%M %p').lstrip('0')}"
 
     slots = _safe_int(value.get("slots"), 0)
+    team_size = _team_size(value.get("team"))
+    player_slots = slots * team_size
     joined = _safe_int(value.get("joinedCount"), 0)
     prizes = value.get("prizes")
     if not isinstance(prizes, list):
@@ -803,6 +812,8 @@ def _present(
         "map": value.get("map", ""),
         "fee": _safe_int(value.get("fee"), 0),
         "slots": slots,
+        "playerSlots": player_slots,
+        "teamSize": team_size,
         "joined": joined,
         "duration_min": duration,
         "per_kill": _safe_int(value.get("perKill"), 0),
@@ -811,7 +822,7 @@ def _present(
         "room_id": value.get("roomId", ""),
         "room_pass": value.get("roomPass", ""),
         "status": status,
-        "players": f"{joined}/{slots}",
+        "players": f"{joined}/{player_slots}",
         "when": when,
         "secs": seconds,
         "label": label,
@@ -834,6 +845,10 @@ def _default_present(identifier: str, value: dict[str, Any]) -> dict[str, Any]:
         "slots": _safe_int(value.get("slots"), 0),
         "loot": value.get("loot") is True,
     }
+
+
+def _team_size(team: Any) -> int:
+    return TEAM_SIZES.get(team, 1)
 
 
 def _parse_start(value: Any) -> datetime:

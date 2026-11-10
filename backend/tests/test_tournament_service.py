@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 from typing import Any
 from unittest.mock import patch
@@ -8,11 +8,13 @@ from zoneinfo import ZoneInfo
 from app.services import tournament_service
 from app.services.tournament_service import (
     TournamentInputError,
+    TournamentJoinError,
     create_from_default,
     create_tournament,
     dashboard_counts,
     delete_tournament,
     joined_matches,
+    slots_for_tournament,
     validate_tournament,
 )
 from app.services.wallet_service import InsufficientFunds, entry_fee_deltas
@@ -230,6 +232,113 @@ class TournamentServiceTests(unittest.TestCase):
             [match["mySlot"] for match in matches],
             [7, 14],
         )
+
+    def test_team_slot_capacity_expands_to_individual_player_seats(self) -> None:
+        db = FakeFirestore()
+        db.data["tournaments"]["duo-match"] = {
+            "team": "Duo",
+            "slots": 24,
+        }
+        db.data["tournaments"]["squad-match"] = {
+            "team": "Squad",
+            "slots": 12,
+        }
+        db.data["tournamentEntries"]["taken-seat"] = {
+            "tournamentId": "duo-match",
+            "uid": "player-2",
+            "slot": 2,
+        }
+
+        duo = slots_for_tournament("duo-match", "player-1", db)
+        squad = slots_for_tournament("squad-match", "player-1", db)
+
+        self.assertEqual(
+            (duo["slots"], duo["teamSlots"], duo["teamSize"], duo["taken"]),
+            (48, 24, 2, [2]),
+        )
+        self.assertEqual(
+            (squad["slots"], squad["teamSlots"], squad["teamSize"]),
+            (48, 12, 4),
+        )
+        self.assertEqual(
+            tournament_service._present(
+                "duo-match",
+                {"team": "Duo", "slots": 24, "joinedCount": 17},
+                datetime.now(timezone.utc),
+            )["players"],
+            "17/48",
+        )
+
+    def test_duo_join_accepts_last_individual_seat_beyond_team_count(self) -> None:
+        db = FakeFirestore()
+        db.data.setdefault("users", {})
+        db.data.setdefault("wallets", {})
+        db.data.setdefault("tournamentSlotClaims", {})
+        db.data["users"]["player-1"] = {
+            "gameOk": True,
+            "gameUid": "123456789",
+            "ign": "Player One",
+        }
+        db.data["tournaments"]["duo-match"] = {
+            "team": "Duo",
+            "slots": 24,
+            "fee": 0,
+            "joinedCount": 47,
+            "startAt": datetime.now(timezone.utc) + timedelta(days=2),
+            "durationMin": 25,
+        }
+        transaction = FakeTransaction()
+
+        with patch.object(
+            tournament_service,
+            "run_transaction",
+            side_effect=lambda _db, operation: operation(transaction),
+        ):
+            result = tournament_service.join_tournament(
+                "player-1",
+                "duo-match",
+                48,
+                db,
+            )
+
+        self.assertEqual(result["slot"], 48)
+        self.assertEqual(
+            next(iter(db.data["tournamentEntries"].values()))["slot"],
+            48,
+        )
+        self.assertEqual(db.data["tournaments"]["duo-match"]["joinedCount"], 48)
+
+    def test_join_rejects_seat_beyond_team_capacity(self) -> None:
+        db = FakeFirestore()
+        db.data.setdefault("users", {})
+        db.data.setdefault("wallets", {})
+        db.data.setdefault("tournamentSlotClaims", {})
+        db.data["users"]["player-1"] = {
+            "gameOk": True,
+            "gameUid": "123456789",
+            "ign": "Player One",
+        }
+        db.data["tournaments"]["duo-match"] = {
+            "team": "Duo",
+            "slots": 24,
+            "fee": 0,
+            "joinedCount": 48,
+            "startAt": datetime.now(timezone.utc) + timedelta(days=2),
+            "durationMin": 25,
+        }
+
+        with self.assertRaisesRegex(TournamentJoinError, "valid slot"):
+            with patch.object(
+                tournament_service,
+                "run_transaction",
+                side_effect=lambda _db, operation: operation(FakeTransaction()),
+            ):
+                tournament_service.join_tournament(
+                    "player-1",
+                    "duo-match",
+                    49,
+                    db,
+                )
 
     def test_create_and_reuse_default_persist_to_shared_collections(self) -> None:
         db = FakeFirestore()
