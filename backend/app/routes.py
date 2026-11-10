@@ -39,7 +39,12 @@ from app.services.tournament_service import (
     list_tournaments,
     slots_for_tournament,
 )
-from app.services.user_service import AccountOnHold, get_or_create_user
+from app.services.user_service import (
+    AccountDeletionError,
+    AccountOnHold,
+    delete_user_account,
+    get_or_create_user,
+)
 from app.services.wallet_service import (
     InsufficientFunds,
     apply,
@@ -129,6 +134,24 @@ def get_profile_stats() -> tuple[Any, int]:
     if _is_held(user or {}):
         return held_error()
     return jsonify({"ok": True, **profile_stats(g.uid)}), 200
+
+
+@api.post("/api/account/delete")
+@require_auth
+def delete_account() -> tuple[Any, int]:
+    try:
+        delete_user_account(
+            g.uid,
+            db=get_db(),
+            storage_bucket=get_storage_bucket(),
+        )
+    except AccountDeletionError as error:
+        current_app.logger.warning(
+            "Account deletion was blocked (%s).",
+            type(error).__name__,
+        )
+        return api_error(str(error), error.status_code)
+    return jsonify({"ok": True}), 200
 
 
 @api.get("/api/matches")

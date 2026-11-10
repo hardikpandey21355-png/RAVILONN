@@ -124,6 +124,7 @@ def require_auth(function: F) -> F:
             "api.get_tournaments",
             "api.app_status",
             "api.wallet_payment_status",
+            "api.delete_account",
         }:
             from app.services.settings_service import get_settings, maintenance_info
 

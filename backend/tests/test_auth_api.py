@@ -205,10 +205,15 @@ class AuthApiTests(unittest.TestCase):
             "/api/wallet/transactions",
             "/api/profile/game-status",
             "/api/notifications",
+            "/api/account/delete",
         )
         for path in paths:
             with self.subTest(path=path):
-                response = self.client.get(path)
+                response = (
+                    self.client.post(path)
+                    if path == "/api/account/delete"
+                    else self.client.get(path)
+                )
                 self.assertEqual(response.status_code, 401)
                 self.assertFalse(response.json["ok"])
 
