@@ -20,7 +20,7 @@ select.inp option{background:#13132a}
   <p class="hint2">Use this when we made a mistake (for example a payment was wrongly rejected). The player gets a notification: "Sorry for our fault, we have added money to your wallet."</p>
   <label>Free Fire UID (or account ID) of the player
     <div class="row2"><input class="inp" id="wcQuery" autocomplete="off" placeholder="e.g. 1234567890">
-    <button class="btn" type="button" id="wcFind">Find player</button></div></label>
+    <button class="btn find-btn" type="button" id="wcFind">Find player</button></div></label>
   <p class="err" id="wcErr"></p>
 
   <div class="who" id="wcPlayer" hidden>
@@ -63,6 +63,9 @@ select.inp option{background:#13132a}
   var fmt = function (n) { return Number(n).toLocaleString('en-IN'); };
   var found = null, busy = false;
 
+  $('wcQuery').addEventListener('input', function () {
+    $('wcFind').classList.toggle('is-ready', $('wcQuery').value.trim().length > 0);
+  });
   $('wcFind').addEventListener('click', function () {
     if (busy) return;
     var q = $('wcQuery').value.trim();

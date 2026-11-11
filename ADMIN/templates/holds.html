@@ -20,7 +20,7 @@
   <p class="hint2">The player sees a "your account is on hold" popup when they open the app, and cannot join matches, add money or withdraw until you release the account.</p>
   <label>Free Fire UID (or account ID) of the player
     <div class="row2"><input class="inp" id="hQuery" autocomplete="off" placeholder="e.g. 1234567890">
-    <button class="btn" type="button" id="hFind">Find player</button></div></label>
+    <button class="btn find-btn" type="button" id="hFind">Find player</button></div></label>
   <p class="err" id="hErr"></p>
   <div class="who" id="hPlayer" hidden><b id="hName"></b><small id="hUid"></small></div>
   <div id="hForm" style="display:none;gap:10px">
@@ -50,6 +50,9 @@
   var $ = function (i) { return document.getElementById(i); };
   var found = null, busy = false;
 
+  $('hQuery').addEventListener('input', function () {
+    $('hFind').classList.toggle('is-ready', $('hQuery').value.trim().length > 0);
+  });
   $('hFind').addEventListener('click', function () {
     if (busy) return;
     var q = $('hQuery').value.trim();

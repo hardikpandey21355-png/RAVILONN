@@ -36,7 +36,7 @@ select.inp option{background:#13132a}
   <p class="hint2">Search by the player's account UID or Free Fire UID. You can view account and wallet details, or record a balance deduction. Every deduction is added to the wallet ledger and audit log, and the player is notified.</p>
   <div class="row2">
     <input class="inp" id="ceQuery" autocomplete="off" placeholder="Enter account UID or Free Fire UID">
-    <button class="btn primary" type="button" id="ceFind">Search player</button>
+    <button class="btn find-btn" type="button" id="ceFind">Search player</button>
   </div>
   <p class="err" id="ceErr" role="alert"></p>
   <div class="who" id="cePlayer" hidden>
@@ -88,6 +88,9 @@ select.inp option{background:#13132a}
   var $ = function (id) { return document.getElementById(id); };
   var found = null, busy = false;
   var fmt = function (value) { return Number(value || 0).toLocaleString('en-IN'); };
+  var syncFindButton = function () {
+    $('ceFind').classList.toggle('is-ready', $('ceQuery').value.trim().length > 0);
+  };
   var hideResults = function () {
     $('cePlayer').hidden = true;
     $('ceActions').hidden = true;
@@ -96,6 +99,8 @@ select.inp option{background:#13132a}
   };
   var showError = function (message) { $('ceErr').textContent = message || ''; };
 
+  $('ceQuery').addEventListener('input', syncFindButton);
+  syncFindButton();
   $('ceFind').addEventListener('click', function () {
     if (busy) return;
     var query = $('ceQuery').value.trim();

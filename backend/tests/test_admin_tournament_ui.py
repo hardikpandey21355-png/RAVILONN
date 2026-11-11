@@ -115,6 +115,19 @@ class AdminTournamentUiTests(unittest.TestCase):
         self.assertIn(b"<b>1</b>", response.data)
         self.assertIn(b"<b>2</b>", response.data)
         self.assertIn(b"<b>3</b>", response.data)
+        self.assertIn(b'aria-label="View live tournaments"', response.data)
+        self.assertIn(b'href="/tournaments"', response.data)
+
+    def test_wallet_player_search_button_has_input_state(self) -> None:
+        with patch.object(admin_app, "list_wallet_credits", return_value=[]):
+            response = self.client.get("/wallet-credit")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'class="btn find-btn" type="button" id="wcFind"', response.data)
+        self.assertIn(
+            b"$('wcFind').classList.toggle('is-ready'",
+            response.data,
+        )
 
     def test_accounts_and_deposits_are_blurred_incomplete_placeholders(self) -> None:
         accounts = self.client.get("/accounts")
@@ -147,10 +160,10 @@ class AdminTournamentUiTests(unittest.TestCase):
         sidebar = response.data.split(b'<nav class="nav">', 1)[1].split(
             b"</nav>", 1
         )[0]
-        approve = sidebar.index(b">Approve amount<span")
-        accounts = sidebar.index(b">Accounts<span")
+        approve = sidebar.index(b"<span>Approve amount</span>")
+        accounts = sidebar.index(b"<span>Accounts</span>")
         self.assertLess(approve, accounts)
-        self.assertLess(sidebar.index(b">Notifications</a>"), approve)
+        self.assertLess(sidebar.index(b'aria-label="Notifications"'), approve)
         self.assertIn(b'<div class="nav-divider" role="separator"></div>', sidebar)
         self.assertEqual(sidebar.count(b'class="nav-disabled"'), 2)
         self.assertNotIn(b'href="/deposits"', sidebar)
@@ -163,11 +176,11 @@ class AdminTournamentUiTests(unittest.TestCase):
             b"</nav>", 1
         )[0]
         self.assertLess(
-            sidebar.index(b">Notifications</a>"),
-            sidebar.index(b">Check and edit</a>"),
+            sidebar.index(b'aria-label="Notifications"'),
+            sidebar.index(b'aria-label="Check and edit"'),
         )
         self.assertLess(
-            sidebar.index(b">Check and edit</a>"),
+            sidebar.index(b'aria-label="Check and edit"'),
             sidebar.index(b'class="nav-divider"'),
         )
         self.assertIn(b"View full details", response.data)

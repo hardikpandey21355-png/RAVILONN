@@ -4,10 +4,18 @@
 {% block content %}
 
 <section class="cards">
-  <div class="card"><small><i class="dot live"></i>Live now</small><b>{{ c.live }}</b></div>
-  <div class="card"><small>Upcoming</small><b>{{ c.upcoming }}</b></div>
-  <div class="card"><small>Completed</small><b>{{ c.completed }}</b></div>
-  <div class="card"><small>Slots filled</small><b>{{ c.joined }}<span> / {{ c.slots }}</span></b></div>
+  <a class="card card-link" href="{{ url_for('tournaments') }}" aria-label="View live tournaments">
+    <small><i class="dot live"></i>Live now<span class="card-arrow" aria-hidden="true">↗</span></small><b>{{ c.live }}</b>
+  </a>
+  <a class="card card-link" href="{{ url_for('tournaments') }}" aria-label="View upcoming tournaments">
+    <small>Upcoming<span class="card-arrow" aria-hidden="true">↗</span></small><b>{{ c.upcoming }}</b>
+  </a>
+  <a class="card card-link" href="{{ url_for('tournaments') }}" aria-label="View completed tournaments">
+    <small>Completed<span class="card-arrow" aria-hidden="true">↗</span></small><b>{{ c.completed }}</b>
+  </a>
+  <a class="card card-link" href="{{ url_for('tournaments') }}" aria-label="View tournament player slots">
+    <small>Slots filled<span class="card-arrow" aria-hidden="true">↗</span></small><b>{{ c.joined }}<span> / {{ c.slots }}</span></b>
+  </a>
 </section>
 
 {% if c.total == 0 %}

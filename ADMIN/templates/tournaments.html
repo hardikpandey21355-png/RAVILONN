@@ -13,11 +13,11 @@
 {% else %}
 <style>
 .tgl{display:flex;gap:10px;max-width:420px;margin-bottom:16px}
-.tgl button{flex:1;height:46px;border-radius:12px;font-size:14px;font-weight:600;color:#fff;
-  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);transition:.15s}
+.tgl button{flex:1;height:46px;border-radius:10px;font-size:14px;font-weight:600;color:#fff;
+  background:#202023;border:1px solid #3a3a3e;transition:.15s}
 .tgl button span{font-weight:500;color:var(--muted);margin-left:4px}
-.tgl button.on{background:var(--btn);border-color:rgba(255,255,255,.35);box-shadow:0 0 14px rgba(168,85,247,.45)}
-.tgl button.on span{color:#fff}
+.tgl button.on{background:var(--accent);border-color:var(--accent);color:var(--ink)}
+.tgl button.on span{color:var(--ink)}
 .norows{padding:22px;text-align:center;font-size:13px;color:var(--muted)}
 </style>
 <div class="tgl" id="tgl">
