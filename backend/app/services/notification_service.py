@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -10,6 +11,7 @@ from app.core.firestore import get_db, run_transaction
 
 IST = ZoneInfo("Asia/Kolkata")
 MAX_NOTIFICATION_BATCH = 450
+MAX_NOTIFICATION_WORKERS = 32
 
 
 class NotificationInputError(ValueError):
@@ -80,18 +82,30 @@ def notify_users(
     database = db or get_db()
     title, body, link = validate_content(title, body, link)
     counts = {"sent": 0, "failed": 0, "no_device": 0, "inbox_saved": 0}
-    for uid in dict.fromkeys(recipients):
-        status = deliver_to_user(
-            uid,
-            title,
-            body,
-            link,
-            category=category,
-            admin_uid=admin_uid,
-            db=database,
-        )
-        counts["inbox_saved"] += 1
-        counts[status] += 1
+    unique_recipients = list(dict.fromkeys(recipients))
+    if not unique_recipients:
+        return counts
+
+    with ThreadPoolExecutor(
+        max_workers=min(MAX_NOTIFICATION_WORKERS, len(unique_recipients))
+    ) as executor:
+        futures = [
+            executor.submit(
+                deliver_to_user,
+                uid,
+                title,
+                body,
+                link,
+                category=category,
+                admin_uid=admin_uid,
+                db=database,
+            )
+            for uid in unique_recipients
+        ]
+        for future in as_completed(futures):
+            status = future.result()
+            counts["inbox_saved"] += 1
+            counts[status] += 1
     return counts
 
 

@@ -1,3 +1,4 @@
+import threading
 import unittest
 from typing import Any
 from unittest.mock import patch
@@ -91,6 +92,30 @@ class FakeFirestore:
 
 
 class NotificationServiceTests(unittest.TestCase):
+    def test_delivers_to_multiple_recipients_concurrently(self) -> None:
+        peers_ready = threading.Barrier(2)
+
+        def wait_for_peer(*_args: Any, **_kwargs: Any) -> str:
+            peers_ready.wait(timeout=2)
+            return "sent"
+
+        with patch(
+            "app.services.notification_service.deliver_to_user",
+            side_effect=wait_for_peer,
+        ):
+            counts = notify_users(
+                ["player-one", "player-two"],
+                "Tournament update",
+                "Your match details are ready.",
+                "/matches",
+                db=FakeFirestore(),
+            )
+
+        self.assertEqual(
+            counts,
+            {"sent": 2, "failed": 0, "no_device": 0, "inbox_saved": 2},
+        )
+
     def test_saves_inbox_for_each_target_and_pushes_only_enabled_devices(self) -> None:
         db = FakeFirestore()
         with patch("app.services.notification_service.messaging.send") as send:
