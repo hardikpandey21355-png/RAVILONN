@@ -36,6 +36,41 @@ class AdminTournamentUiTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 302)
 
+    def test_json_post_after_admin_session_expires_returns_json_error(self) -> None:
+        with self.client.session_transaction() as session:
+            session.clear()
+
+        with patch.object(admin_app, "notify_users") as notify:
+            response = self.client.post(
+                "/notify/send",
+                json={"title": "Meeting update", "body": "Meeting starts soon."},
+            )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(
+            response.json,
+            {"ok": False, "error": "Admin session expired. Sign in again."},
+        )
+        notify.assert_not_called()
+
+    def test_json_post_with_stale_csrf_returns_json_error(self) -> None:
+        with patch.object(admin_app, "notify_users") as notify:
+            response = self.client.post(
+                "/notify/send",
+                json={"title": "Meeting update", "body": "Meeting starts soon."},
+                headers={"X-CSRF": "stale-token"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json,
+            {
+                "ok": False,
+                "error": "This admin page is stale. Refresh and sign in again.",
+            },
+        )
+        notify.assert_not_called()
+
     def test_create_form_calls_shared_firestore_service_and_saves_default(self) -> None:
         start = (datetime.now(IST) + timedelta(days=1)).replace(tzinfo=None)
         with patch.object(admin_app, "create_tournament") as create:

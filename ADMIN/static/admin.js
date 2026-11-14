@@ -12,8 +12,22 @@
   // POST JSON to the admin server (adds the CSRF header for you)
   window.api = function (url, body) {
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF': csrf }, body: JSON.stringify(body || {}) })
-      .then(function (r) { return r.json(); })
-      .catch(function () { return { ok: false, error: 'Network problem. Try again.' }; });
+      .then(function (r) {
+        return r.text().then(function (text) {
+          var data;
+          try { data = JSON.parse(text); }
+          catch (e) {
+            return {
+              ok: false,
+              error: r.redirected
+                ? 'Admin session expired. Refresh and sign in again.'
+                : 'Admin server returned an unexpected response (HTTP ' + r.status + '). Try again.'
+            };
+          }
+          return data;
+        });
+      })
+      .catch(function () { return { ok: false, error: 'Unable to reach the admin server. Check your connection and try again.' }; });
   };
 
   // Keep the desktop sidebar preference while moving between admin pages.

@@ -15,6 +15,7 @@ from app.services.tournament_service import (
     dashboard_counts,
     delete_tournament,
     joined_matches,
+    save_room_details,
     slots_for_tournament,
     validate_tournament,
 )
@@ -168,6 +169,42 @@ def valid_payload(*, loot: bool = False) -> dict[str, Any]:
 
 
 class TournamentServiceTests(unittest.TestCase):
+    def test_saving_room_details_notifies_entrants_with_password(self) -> None:
+        db = FakeFirestore()
+        db.data["tournaments"]["tournament-1"] = {
+            "mode": "BR Solo",
+            "roomId": "",
+            "roomPass": "",
+        }
+        db.data["tournamentEntries"]["entry-1"] = {
+            "uid": "player-1",
+            "tournamentId": "tournament-1",
+        }
+        counts = {"sent": 1, "failed": 0, "no_device": 0, "inbox_saved": 1}
+
+        with (
+            patch.object(
+                tournament_service,
+                "run_transaction",
+                side_effect=lambda _db, operation: operation(FakeTransaction()),
+            ),
+            patch.object(
+                tournament_service, "notify_users", return_value=counts
+            ) as notify,
+        ):
+            result, notified = save_room_details(
+                "tournament-1", " room-123 ", " pass-123 ", db=db
+            )
+
+        self.assertTrue(notified)
+        self.assertEqual(db.data["tournaments"]["tournament-1"]["roomId"], "room-123")
+        self.assertEqual(db.data["tournaments"]["tournament-1"]["roomPass"], "pass-123")
+        notify.assert_called_once()
+        self.assertEqual(notify.call_args.args[0], ["player-1"])
+        self.assertIn("Room ID: room-123. Password: pass-123.", notify.call_args.args[2])
+        self.assertEqual(notify.call_args.kwargs["category"], "tournament_room")
+        self.assertEqual(result["notificationCounts"], counts)
+
     def test_joined_matches_include_only_account_entries_and_approved_rewards(self) -> None:
         db = FakeFirestore()
         now = datetime.now(IST)

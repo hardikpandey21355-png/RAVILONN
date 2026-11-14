@@ -102,11 +102,22 @@ def require_admin_login():
     if request.endpoint in {"login", "static"}:
         return None
     if not session.get("admin_authenticated"):
+        if request.is_json:
+            return jsonify(
+                {"ok": False, "error": "Admin session expired. Sign in again."}
+            ), 401
         return redirect(url_for("login"))
     if request.method == "POST":
         supplied = request.headers.get("X-CSRF") or request.form.get("csrf", "")
         expected = session.get("csrf", "")
         if not expected or not secrets.compare_digest(supplied, expected):
+            if request.is_json:
+                return jsonify(
+                    {
+                        "ok": False,
+                        "error": "This admin page is stale. Refresh and sign in again.",
+                    }
+                ), 400
             abort(400)
     return None
 
