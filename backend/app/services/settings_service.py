@@ -6,7 +6,7 @@ from firebase_admin import firestore
 from app.core.firestore import get_db
 
 
-LATEST_APP_BUILD_NUMBER = 8
+LATEST_APP_BUILD_NUMBER = 9
 
 
 DEFAULT_SETTINGS = {
@@ -21,11 +21,8 @@ DEFAULT_SETTINGS = {
     "appUpdateEnabled": True,
     "appUpdateForce": True,
     "appLatestVersionCode": LATEST_APP_BUILD_NUMBER,
-    "appLatestVersionName": "1.1.0",
-    "appDownloadUrl": (
-        "https://github.com/hardikpandey21355-png/"
-        "Rival-on-website/raw/refs/heads/main/Ravilon.apk"
-    ),
+    "appLatestVersionName": "1.2.0",
+    "appDownloadUrl": "https://rivalon-site.vercel.app/Ravilon.apk",
     "appUpdateMessage": "App use karte rehne ke liye latest update install karein.",
     "appPopupEnabled": False,
     "appPopupTitle": "Ready for your next match?",

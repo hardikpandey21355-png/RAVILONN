@@ -234,7 +234,7 @@ def app_update_info() -> tuple[Any, int]:
         version_code = max(version_code, LATEST_APP_BUILD_NUMBER)
     version_name = settings["appLatestVersionName"]
     if not isinstance(version_name, str):
-        version_name = "1.1.0"
+        version_name = "1.2.0"
     download_url = settings["appDownloadUrl"]
     if not isinstance(download_url, str):
         download_url = ""

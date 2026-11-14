@@ -21,6 +21,12 @@ class SettingsServiceTests(unittest.TestCase):
         self.assertEqual(settings["addMoneyMethod"], "gateway")
         self.assertEqual(get_add_money_method(settings), "gateway")
         self.assertEqual(settings["minAdd"], DEFAULT_SETTINGS["minAdd"])
+        self.assertEqual(settings["appLatestVersionCode"], 9)
+        self.assertEqual(settings["appLatestVersionName"], "1.2.0")
+        self.assertEqual(
+            settings["appDownloadUrl"],
+            "https://rivalon-site.vercel.app/Ravilon.apk",
+        )
 
     def test_invalid_stored_payment_method_fails_closed(self) -> None:
         self.assertEqual(get_add_money_method({"addMoneyMethod": {"unexpected": True}}), "off")

@@ -108,7 +108,7 @@ class AppUpdateApiTests(unittest.TestCase):
                 "ok": True,
                 "enabled": False,
                 "forceUpdate": False,
-                "latestBuildNumber": 8,
+                "latestBuildNumber": 9,
                 "latestVersionName": "1.1.0",
                 "downloadUrl": "https://example.com/Ravilon.apk",
                 "message": "An update is available.",
