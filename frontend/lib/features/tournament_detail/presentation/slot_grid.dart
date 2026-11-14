@@ -9,6 +9,7 @@ class SlotGrid extends StatelessWidget {
     required this.slots,
     required this.teamSize,
     required this.taken,
+    required this.reserved,
     required this.picked,
     required this.loot,
     required this.onPick,
@@ -19,6 +20,7 @@ class SlotGrid extends StatelessWidget {
   final int slots;
   final int teamSize;
   final Set<int> taken;
+  final Set<int> reserved;
   final int picked;
   final bool loot;
   final ValueChanged<int> onPick;
@@ -138,6 +140,7 @@ class SlotGrid extends StatelessWidget {
     child: _SlotButton(
       n: number,
       taken: taken.contains(number),
+      reserved: reserved.contains(number),
       on: picked == number,
       loot: loot,
       onTap: () => onPick(number),
@@ -149,6 +152,7 @@ class _SlotButton extends StatelessWidget {
   const _SlotButton({
     required this.n,
     required this.taken,
+    required this.reserved,
     required this.on,
     required this.loot,
     required this.onTap,
@@ -156,6 +160,7 @@ class _SlotButton extends StatelessWidget {
 
   final int n;
   final bool taken;
+  final bool reserved;
   final bool on;
   final bool loot;
   final VoidCallback onTap;
@@ -172,6 +177,10 @@ class _SlotButton extends StatelessWidget {
       bg = const Color(0xFF0A0A0A);
       border = const Color(0xFF1C1C1C);
       fg = const Color(0xFF4A4A4A);
+    } else if (reserved) {
+      bg = const Color(0xFF211A0B);
+      border = const Color(0xFF8A6A22);
+      fg = const Color(0xFFFFD66B);
     } else if (on) {
       if (loot) {
         bg = _c(247, 215, 116, .18);
@@ -212,21 +221,32 @@ class _SlotButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(9),
               border: Border.all(color: border, width: 1),
             ),
-            child: Text(
-              '$n',
-              style: _t(12, FontWeight.w600, fg).copyWith(
-                decoration: taken
-                    ? TextDecoration.lineThrough
-                    : TextDecoration.none,
-                decorationColor: fg,
-              ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                Text(
+                  '$n',
+                  style: _t(12, FontWeight.w600, fg).copyWith(
+                    decoration: taken
+                        ? TextDecoration.lineThrough
+                        : TextDecoration.none,
+                    decorationColor: fg,
+                  ),
+                ),
+                if (reserved)
+                  Positioned(
+                    top: 1,
+                    right: 2,
+                    child: Text('R', style: _t(7, FontWeight.w700, fg)),
+                  ),
+              ],
             ),
           ),
         );
       },
     );
 
-    if (taken) return box;
+    if (taken || reserved) return box;
     return RsPress(
       scale: .92,
       duration: const Duration(milliseconds: 200),

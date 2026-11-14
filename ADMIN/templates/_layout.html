@@ -35,6 +35,10 @@
        <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Add to wallet</span></a>
       <a href="{{ url_for('payment_methods') }}" class="{{ 'on' if active == 'payment_methods' }}" aria-label="Payment methods" title="Payment methods">
         <svg class="i" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg><span>Payment methods</span></a>
+      <a href="{{ url_for('app_update') }}" class="{{ 'on' if active == 'app_update' }}" aria-label="App update" title="App update">
+        <svg class="i" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"/></svg><span>App update</span></a>
+      <a href="{{ url_for('app_popup_preview') }}" class="{{ 'on' if active == 'app_popup' }}" aria-label="APK Pop-up" title="APK Pop-up">
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v12H4zM8 21h8m-4-4v4M8 9h8m-8 4h5"/></svg><span>APK Pop-up</span></a>
       <a href="{{ url_for('holds') }}" class="{{ 'on' if active == 'holds' }}" aria-label="Account holds" title="Account holds">
         <svg class="i" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Account holds</span>{% if holds_count %}<em class="bdg">{{ holds_count }}</em>{% endif %}</a>
       <a href="{{ url_for('maintenance') }}" class="{{ 'on' if active == 'maintenance' }}" aria-label="Maintenance" title="Maintenance">

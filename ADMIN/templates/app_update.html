@@ -1,0 +1,61 @@
+{% extends "_layout.html" %}
+{% block title %}App update{% endblock %}
+{% block content %}
+<style>
+.hint2{font-size:12px;color:var(--muted);line-height:1.55;max-width:640px;margin-bottom:14px}
+.warning{max-width:640px;border:1px solid rgba(251,191,36,.55);background:rgba(251,191,36,.08);border-radius:14px;padding:14px;margin-bottom:16px;font-size:12px;line-height:1.55}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px;max-width:640px}
+.box label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+.toggle{display:flex;align-items:center;gap:10px}
+.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+</style>
+
+<p class="hint2">APK update policy controls the update prompt shown inside the app. This page does not upload an APK; host the APK first and enter its HTTPS download URL. Saving changes affects app users as soon as the backend setting is read.</p>
+<div class="warning"><b>Shared live setting:</b> the admin panel writes to the shared Firestore project. Do not save changes during USB testing unless you intend to change the update policy for users.</div>
+
+<div class="box">
+  <label class="toggle"><input id="enabled" type="checkbox" {{ 'checked' if a.enabled }}>
+    <span>Enable update prompt</span></label>
+  <label class="toggle"><input id="force" type="checkbox" {{ 'checked' if a.force }}>
+    <span>Make update mandatory</span></label>
+  <label>Version code
+    <input class="inp" id="versionCode" type="number" min="1" step="1" value="{{ a.version_code }}"></label>
+  <label>Version name
+    <input class="inp" id="versionName" maxlength="32" autocomplete="off" value="{{ a.version_name }}"></label>
+  <label>Hosted APK HTTPS URL
+    <input class="inp" id="downloadUrl" type="url" maxlength="1000" autocomplete="url" value="{{ a.download_url }}"></label>
+  <label>Message shown in the app
+    <input class="inp" id="message" maxlength="200" autocomplete="off" value="{{ a.message }}"></label>
+  <p class="err" id="err"></p>
+  <button class="btn primary wide" type="button" id="save">Save update settings</button>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); }, busy = false;
+  $('save').addEventListener('click', function () {
+    if (busy) return;
+    var enabled = $('enabled').checked, force = $('force').checked;
+    if (!confirm('These settings affect the shared app-update policy. Continue?')) return;
+    busy = true; this.disabled = true; $('err').textContent = '';
+    var button = this;
+    window.api('/app-update/save', {
+      enabled: enabled,
+      force: force,
+      versionCode: Number($('versionCode').value),
+      versionName: $('versionName').value,
+      downloadUrl: $('downloadUrl').value,
+      message: $('message').value
+    }).then(function (response) {
+      busy = false; button.disabled = false;
+      if (!response.ok) { $('err').textContent = response.error || 'Could not save update settings.'; return; }
+      $('force').checked = response.appUpdateForce;
+      window.toast('Saved. Update policy is now active.');
+    }).catch(function () {
+      busy = false; button.disabled = false;
+      $('err').textContent = 'Could not save update settings.';
+    });
+  });
+})();
+</script>
+{% endblock %}

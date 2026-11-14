@@ -46,6 +46,8 @@ Loot matches are free for players (no entry fee) and run only on <b>Saturday</b>
     </div>
     <div class="drow">
       <input class="inp dst" type="datetime-local" aria-label="Start date and time (Saturday or Sunday)">
+      <input class="inp dreserved" type="number" min="0" max="{{ t.playerSlots }}" step="1"
+             placeholder="Reserved seats (optional)" aria-label="Reserved seats (optional; blank or zero turns them off)">
       <button class="btn primary dgo" type="button">Create</button>
     </div>
   </div>
@@ -75,6 +77,13 @@ Loot matches are free for players (no entry fee) and run only on <b>Saturday</b>
   <label>Slots (auto-filled from team type, you can change it)
     <input class="inp" type="number" id="slots" name="slots" min="2" max="1000" required value="{{ f.get('slots', '48') }}">
   </label>
+  <label>Reserved seats (optional; blank/0 = OFF)
+    <input class="inp" type="number" name="simulated_slots_count" min="0" max="4000" step="1"
+           value="{{ f.get('simulated_slots_count', '') }}">
+  </label>
+  <p class="wide-col" style="font-size:12px;color:var(--muted);margin:0">
+    Enter a count to turn reservations ON. Each successful real join releases one reserved seat until none remain.
+  </p>
   <label>Duration (minutes)
     <input class="inp" type="number" name="duration" min="5" max="240" required value="{{ f.get('duration', '25') }}">
   </label>
@@ -201,8 +210,13 @@ Loot matches are free for players (no entry fee) and run only on <b>Saturday</b>
     if (e.target.closest('.dgo')) {
       var st = card.querySelector('.dst').value;
       if (!st) { window.toast('Choose the start date and time first.'); return; }
+      var reservedInput = card.querySelector('.dreserved');
+      var reservedCount = reservedInput.value === '' ? 0 : Number(reservedInput.value);
+      if (!Number.isInteger(reservedCount) || reservedCount < 0 || reservedCount > Number(reservedInput.max)) {
+        window.toast('Enter a whole number between 0 and ' + reservedInput.max + '.'); return;
+      }
       busy = true;
-      window.api('/loot/from-default/' + id, { start: st }).then(function (r) {
+      window.api('/loot/from-default/' + id, { start: st, simulatedSlotsCount: reservedCount }).then(function (r) {
         busy = false;
         if (!r.ok) { window.toast(r.error || 'Something went wrong.'); return; }
         window.toast('Loot match created.'); setTimeout(function () { location.reload(); }, 800);

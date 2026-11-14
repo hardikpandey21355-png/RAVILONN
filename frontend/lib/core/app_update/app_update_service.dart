@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../auth/api_client.dart';
+import 'app_popup_service.dart';
 
-const int currentAppBuildNumber = 8;
+const int currentAppBuildNumber = 9;
 
 class AppUpdateService {
   AppUpdateService({ApiClient? apiClient})
@@ -13,6 +14,8 @@ class AppUpdateService {
 
   Future<void> checkOnOpen(BuildContext context) async {
     await _checkForUpdate(context);
+    if (!context.mounted) return;
+    await AppPopupService(apiClient: _apiClient).checkOnOpen(context);
   }
 
   Future<void> _checkForUpdate(BuildContext context) async {

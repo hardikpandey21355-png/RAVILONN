@@ -16,6 +16,7 @@ from app.core.auth import (
 )
 from app.core.firestore import get_db, get_storage_bucket, run_transaction
 from app.services.settings_service import (
+    DEFAULT_SETTINGS,
     LATEST_APP_BUILD_NUMBER,
     get_add_money_method,
     get_settings,
@@ -237,17 +238,58 @@ def app_update_info() -> tuple[Any, int]:
     download_url = settings["appDownloadUrl"]
     if not isinstance(download_url, str):
         download_url = ""
-    message = "App use karte rehne ke liye latest update install karein."
+    message = settings["appUpdateMessage"]
+    if not isinstance(message, str) or not message:
+        message = "App use karte rehne ke liye latest update install karein."
+    enabled = settings.get("appUpdateEnabled") is True
+    force_update = enabled and settings.get("appUpdateForce") is True
 
     return jsonify(
         {
             "ok": True,
-            "enabled": True,
-            "forceUpdate": True,
+            "enabled": enabled,
+            "forceUpdate": force_update,
             "latestBuildNumber": version_code,
             "latestVersionName": version_name,
             "downloadUrl": download_url,
             "message": message,
+        }
+    ), 200
+
+
+@api.get("/api/app-popup")
+@require_auth
+def app_popup_info() -> tuple[Any, int]:
+    user, error = _require_user()
+    if error:
+        return error
+    if _is_held(user or {}):
+        return held_error()
+
+    settings = get_settings()
+    title = settings.get("appPopupTitle")
+    message = settings.get("appPopupMessage")
+    show_mode = settings.get("appPopupShowMode")
+    return jsonify(
+        {
+            "ok": True,
+            "enabled": settings.get("appPopupEnabled") is True,
+            "title": (
+                title
+                if isinstance(title, str) and title.strip()
+                else DEFAULT_SETTINGS["appPopupTitle"]
+            ),
+            "message": (
+                message
+                if isinstance(message, str) and message.strip()
+                else DEFAULT_SETTINGS["appPopupMessage"]
+            ),
+            "showMode": (
+                show_mode
+                if isinstance(show_mode, str)
+                and show_mode in {"once", "every_open"}
+                else "once"
+            ),
         }
     ), 200
 

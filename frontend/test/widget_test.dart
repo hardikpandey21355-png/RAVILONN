@@ -10,6 +10,7 @@ void main() {
     expect(find.text('RIVALON'), findsOneWidget);
     expect(find.text('Log in'), findsWidgets);
     expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Skip (testing)'), findsNothing);
   });
 
   testWidgets('login and signup watermark stays behind the brand', (

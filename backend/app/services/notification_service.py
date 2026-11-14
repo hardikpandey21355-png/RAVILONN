@@ -2,10 +2,10 @@ from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from firebase_admin import messaging
+from firebase_admin import firestore, messaging
 from firebase_admin.exceptions import FirebaseError
 
-from app.core.firestore import get_db
+from app.core.firestore import get_db, run_transaction
 
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -153,6 +153,10 @@ def deliver_to_user(
             )
             status = "sent"
             error = ""
+        except messaging.UnregisteredError as exception:
+            status = "failed"
+            error = type(exception).__name__
+            _remove_unregistered_fid(database, uid, token.strip())
         except (FirebaseError, ValueError) as exception:
             status = "failed"
             error = type(exception).__name__
@@ -175,6 +179,18 @@ def deliver_to_user(
         }
     )
     return status
+
+
+def _remove_unregistered_fid(db: Any, uid: str, fid: str) -> None:
+    user_ref = db.collection("users").document(uid)
+
+    def remove_if_unchanged(transaction: Any) -> None:
+        snapshot = transaction.get(user_ref)
+        user = snapshot.to_dict() or {}
+        if user.get("fcmToken") == fid:
+            transaction.update(user_ref, {"fcmToken": firestore.DELETE_FIELD})
+
+    run_transaction(db, remove_if_unchanged)
 
 
 def recent_admin_notifications(limit: int = 100, db: Any = None) -> list[dict[str, Any]]:

@@ -65,6 +65,9 @@ class Tournament {
     this.remote = false,
     this.roomId = '',
     this.roomPass = '',
+    this.reservedCount = 0,
+    this.joinedCount = 0,
+    this.playerSlots = 0,
   });
   final String id;
   final String game;
@@ -87,6 +90,31 @@ class Tournament {
   final bool remote;
   final String roomId;
   final String roomPass;
+  final int reservedCount;
+  final int joinedCount;
+  final int playerSlots;
+  int get actualJoinedCount {
+    final actual = joinedCount > 0 || playerSlots > 0
+        ? joinedCount
+        : int.tryParse(players.split('/').first) ?? 0;
+    return actual > 0 ? actual : 0;
+  }
+
+  int get activeReservedCount => reservedCount > 0 ? reservedCount : 0;
+  int get slotCapacity {
+    if (playerSlots > 0) return playerSlots;
+    final parts = players.split('/');
+    return parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+  }
+
+  int get totalBookedCount {
+    final booked = actualJoinedCount + activeReservedCount;
+    return slotCapacity > 0 && booked > slotCapacity ? slotCapacity : booked;
+  }
+
+  String get bookedPlayers => slotCapacity > 0
+      ? '$totalBookedCount/$slotCapacity'
+      : '$totalBookedCount';
   String get img => bg;
   String get teamType =>
       team.isNotEmpty ? team : detail.split('|').first.trim();

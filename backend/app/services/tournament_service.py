@@ -126,6 +126,23 @@ def slots_for_tournament(
         _safe_int((entry.to_dict() or {}).get("slot"), 0)
         for entry in entries
     )
+    taken_set = set(taken)
+    reserved = []
+    stored_reserved = value.get("reservedSlots")
+    if (
+        value.get("simulatedSlotsEnabled") is not True
+        or not isinstance(stored_reserved, list)
+    ):
+        stored_reserved = []
+    for slot in stored_reserved:
+        if (
+            isinstance(slot, int)
+            and not isinstance(slot, bool)
+            and 1 <= slot <= team_slots * team_size
+            and slot not in taken_set
+            and slot not in reserved
+        ):
+            reserved.append(slot)
     mine = next(
         (
             entry.to_dict() or {}
@@ -139,6 +156,7 @@ def slots_for_tournament(
         "teamSlots": team_slots,
         "teamSize": team_size,
         "taken": taken,
+        "reserved": reserved,
         "joined": bool(mine),
         "mySlot": mine.get("slot"),
     }
@@ -377,6 +395,18 @@ def join_tournament(
         )
         if slot > slots:
             raise TournamentJoinError("Choose a valid slot.")
+        stored_reserved = tournament.get("reservedSlots")
+        if not isinstance(stored_reserved, list):
+            stored_reserved = []
+        simulated_enabled = tournament.get("simulatedSlotsEnabled") is True
+        reserved_slots = [
+            reserved_slot
+            for reserved_slot in stored_reserved
+            if isinstance(reserved_slot, int)
+            and not isinstance(reserved_slot, bool)
+        ] if simulated_enabled else []
+        if slot in reserved_slots:
+            raise SlotAlreadyTaken("That slot is reserved and will open later.")
         if slot_snapshot.exists:
             raise SlotAlreadyTaken("That slot was just taken. Choose another slot.")
 
@@ -427,6 +457,9 @@ def join_tournament(
             tournament_ref,
             {
                 "joinedCount": _safe_int(tournament.get("joinedCount"), 0) + 1,
+                "reservedSlots": reserved_slots[:-1]
+                if simulated_enabled and reserved_slots
+                else reserved_slots,
                 "updatedAt": firestore.SERVER_TIMESTAMP,
             },
         )
@@ -442,6 +475,77 @@ def join_tournament(
     if result["wallet"] is None:
         result["wallet"] = wallet_for(uid, database)
     return result
+
+
+def set_simulated_slots(
+    tournament_id: str,
+    enabled: bool,
+    count: int,
+    db: Any = None,
+) -> dict[str, Any]:
+    if not isinstance(enabled, bool):
+        raise TournamentInputError("Choose whether simulated slots are on or off.")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise TournamentInputError("Enter a valid reserved seat count.")
+
+    database = db or get_db()
+    tournament_ref = database.collection("tournaments").document(tournament_id)
+    result: dict[str, Any] = {}
+
+    def operation(tx: Any) -> None:
+        snapshot = tournament_ref.get(transaction=tx)
+        if not snapshot.exists:
+            raise TournamentInputError("Tournament was not found.")
+        tournament = snapshot.to_dict() or {}
+        capacity = _safe_int(tournament.get("slots"), 0) * _team_size(
+            tournament.get("team")
+        )
+        if count > capacity:
+            raise TournamentInputError(
+                f"Reserved seats cannot exceed the tournament capacity of {capacity}."
+            )
+
+        entries = (
+            database.collection("tournamentEntries")
+            .where("tournamentId", "==", tournament_id)
+            .stream(transaction=tx)
+        )
+        taken = {
+            _safe_int((entry.to_dict() or {}).get("slot"), 0)
+            for entry in entries
+        }
+        available = [
+            slot for slot in range(1, capacity + 1) if slot not in taken
+        ]
+        reserved = (
+            secrets.SystemRandom().sample(available, min(count, len(available)))
+            if enabled
+            else []
+        )
+        tx.update(
+            tournament_ref,
+            {
+                "simulatedSlotsEnabled": enabled,
+                "simulatedSlotsCount": count,
+                "reservedSlots": reserved,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            },
+        )
+        tournament.update(
+            {
+                "simulatedSlotsEnabled": enabled,
+                "simulatedSlotsCount": count,
+                "reservedSlots": reserved,
+            }
+        )
+        result.update(tournament)
+
+    run_transaction(database, operation)
+    return _present(
+        tournament_id,
+        result,
+        datetime.now(timezone.utc),
+    )
 
 
 def list_defaults(loot: bool = False, db: Any = None) -> list[dict[str, Any]]:
@@ -476,6 +580,25 @@ def create_tournament(
     database = db or get_db()
     data = validate_tournament(payload)
     tournament_ref = database.collection("tournaments").document()
+    player_slots = _safe_int(data.get("slots"), 0) * _team_size(data.get("team"))
+    requested_reserved_count = payload.get(
+        "simulatedSlotsCount",
+        payload.get("simulated_slots_count"),
+    )
+    simulated_slots_count = (
+        0
+        if requested_reserved_count in (None, "")
+        else _integer(
+            requested_reserved_count,
+            "Reserved seats",
+            0,
+            player_slots,
+        )
+    )
+    reserved_slots = secrets.SystemRandom().sample(
+        range(1, player_slots + 1),
+        simulated_slots_count,
+    )
     default_ref = (
         database.collection("tournamentDefaults").document()
         if save_as_default
@@ -499,6 +622,9 @@ def create_tournament(
     tournament_data = {
         **data,
         "joinedCount": 0,
+        "simulatedSlotsEnabled": simulated_slots_count > 0,
+        "simulatedSlotsCount": simulated_slots_count,
+        "reservedSlots": reserved_slots,
         "createdAt": firestore.SERVER_TIMESTAMP,
         "updatedAt": firestore.SERVER_TIMESTAMP,
     }
@@ -525,6 +651,7 @@ def create_tournament(
 def create_from_default(
     default_id: str,
     start_value: Any,
+    simulated_slots_count: Any = 0,
     db: Any = None,
 ) -> dict[str, Any]:
     database = db or get_db()
@@ -538,6 +665,7 @@ def create_from_default(
     data["per_kill"] = data.get("perKill")
     data["banner_pick"] = data.get("banner", "")
     data["start"] = _parse_start(start_value)
+    data["simulatedSlotsCount"] = simulated_slots_count
     return create_tournament(data, db=database)
 
 
@@ -801,6 +929,21 @@ def _present(
     team_size = _team_size(value.get("team"))
     player_slots = slots * team_size
     joined = _safe_int(value.get("joinedCount"), 0)
+    stored_reserved = value.get("reservedSlots")
+    if not isinstance(stored_reserved, list):
+        stored_reserved = []
+    reserved_slots = list(
+        dict.fromkeys(
+            slot
+            for slot in stored_reserved
+            if isinstance(slot, int)
+            and not isinstance(slot, bool)
+            and 1 <= slot <= player_slots
+        )
+    )
+    simulated_slots_enabled = value.get("simulatedSlotsEnabled") is True
+    if not simulated_slots_enabled:
+        reserved_slots = []
     prizes = value.get("prizes")
     if not isinstance(prizes, list):
         prizes = []
@@ -815,6 +958,10 @@ def _present(
         "playerSlots": player_slots,
         "teamSize": team_size,
         "joined": joined,
+        "simulatedSlotsEnabled": simulated_slots_enabled,
+        "simulatedSlotsCount": _safe_int(value.get("simulatedSlotsCount"), 5),
+        "reservedSlots": reserved_slots,
+        "reservedCount": len(reserved_slots),
         "duration_min": duration,
         "per_kill": _safe_int(value.get("perKill"), 0),
         "prize": _safe_int(value.get("prize"), 0),
@@ -834,6 +981,7 @@ def _present(
 
 
 def _default_present(identifier: str, value: dict[str, Any]) -> dict[str, Any]:
+    slots = _safe_int(value.get("slots"), 0)
     return {
         **value,
         "id": identifier,
@@ -842,7 +990,8 @@ def _default_present(identifier: str, value: dict[str, Any]) -> dict[str, Any]:
         "per_kill": _safe_int(value.get("perKill"), 0),
         "prize": _safe_int(value.get("prize"), 0),
         "fee": _safe_int(value.get("fee"), 0),
-        "slots": _safe_int(value.get("slots"), 0),
+        "slots": slots,
+        "playerSlots": slots * _team_size(value.get("team")),
         "loot": value.get("loot") is True,
     }
 

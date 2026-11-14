@@ -71,6 +71,8 @@ void main() {
             'prize': 500,
             'joined': 2,
             'slots': 48,
+            'playerSlots': 48,
+            'reservedCount': 5,
             'players': '2/48',
             'perKill': 10,
             'status': 'upcoming',
@@ -95,6 +97,9 @@ void main() {
     expect(items.single.id, 'admin-created');
     expect(items.single.fee, '₹25');
     expect(items.single.players, '2/48');
+    expect(items.single.joinedCount, 2);
+    expect(items.single.playerSlots, 48);
+    expect(items.single.bookedPlayers, '7/48');
     expect(items.single.roomId, 'room-123');
     expect(items.single.roomPass, 'pass-123');
     expect(items.single.prizes, [('1st', 300), ('2nd', 200)]);

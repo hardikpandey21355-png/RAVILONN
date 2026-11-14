@@ -61,6 +61,28 @@ void main() {
     );
   });
 
+  testWidgets('initial balance callback does not notify during build', (
+    tester,
+  ) async {
+    final balance = ValueNotifier<int>(0);
+    addTearDown(balance.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ValueListenableBuilder<int>(
+          valueListenable: balance,
+          builder: (context, _, _) => WalletPage(
+            walletChip: WalletChip(balanceListenable: balance),
+            onTotalChanged: (total) => balance.value = total,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('withdrawal panel reflects shared profile UPI changes', (
     tester,
   ) async {

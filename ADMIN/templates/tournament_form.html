@@ -57,6 +57,14 @@
     <input class="inp" type="number" id="slots" name="slots" min="2" max="1000" required value="{{ f.get('slots', '48') }}">
   </label>
 
+  <label>Reserved seats (optional; blank/0 = OFF)
+    <input class="inp" type="number" name="simulated_slots_count" min="0" max="4000" step="1"
+           value="{{ f.get('simulated_slots_count', '') }}">
+  </label>
+  <p class="wide-col" style="font-size:12px;color:var(--muted);margin:0">
+    Enter a count to turn reservations ON. Each successful real join releases one reserved seat until none remain.
+  </p>
+
   <label>Duration (minutes, match ends after this)
     <input class="inp" type="number" name="duration" min="5" max="240" required value="{{ f.get('duration', '25') }}">
   </label>

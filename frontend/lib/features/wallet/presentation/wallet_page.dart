@@ -822,7 +822,12 @@ class _WalletPageState extends State<WalletPage> with WidgetsBindingObserver {
     }
     AuthSession.upi.addListener(_syncUpi);
     AuthSession.hasUpi.addListener(_syncUpi);
-    widget.onTotalChanged?.call(_w.total);
+    final onTotalChanged = widget.onTotalChanged;
+    if (onTotalChanged != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) onTotalChanged(_w.total);
+      });
+    }
     _txs = widget.repository == null ? WalletMock.transactions() : <WalletTx>[];
     if (widget.repository != null) {
       unawaited(_refreshWallet());

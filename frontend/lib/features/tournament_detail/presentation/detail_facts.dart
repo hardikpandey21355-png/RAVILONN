@@ -26,6 +26,13 @@ class DetailFacts extends StatelessWidget {
         value: '${t.joinedCount} / ${t.slots}',
         label: 'Players',
       ),
+      if (t.reservedCount > 0)
+        _Fact(
+          icon: _icUsers,
+          hex: '#fbbf24',
+          value: '${t.reservedCount}',
+          label: 'Reserved',
+        ),
       if (t.hasPerKill)
         _Fact(
           icon: _icSwords,
@@ -179,8 +186,10 @@ class _TimerFactState extends State<_TimerFact> {
           ),
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text(widget.label,
-                style: _t(11, FontWeight.w400, _muted, h: 1.5)),
+            child: Text(
+              widget.label,
+              style: _t(11, FontWeight.w400, _muted, h: 1.5),
+            ),
           ),
         ],
       ),
@@ -194,9 +203,10 @@ class _SlotsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final left = t.slots - t.joinedCount;
-    final pct = t.slots == 0 ? 0 : (t.joinedCount * 100) ~/ t.slots;
-    final frac = t.slots == 0 ? 0.0 : (t.joinedCount / t.slots).clamp(0.0, 1.0);
+    final occupied = t.joinedCount + t.reservedCount;
+    final left = t.slots - occupied;
+    final pct = t.slots == 0 ? 0 : (occupied * 100) ~/ t.slots;
+    final frac = t.slots == 0 ? 0.0 : (occupied / t.slots).clamp(0.0, 1.0);
     const rowStyleColor = Color(0xFFBDBDBD);
 
     return _Box(
@@ -210,10 +220,14 @@ class _SlotsBar extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                Text('$left slots left',
-                    style: _t(12, FontWeight.w400, rowStyleColor, h: 1.5)),
-                Text('$pct% full',
-                    style: _t(12, FontWeight.w400, rowStyleColor, h: 1.5)),
+                Text(
+                  '$left slots left',
+                  style: _t(12, FontWeight.w400, rowStyleColor, h: 1.5),
+                ),
+                Text(
+                  '$pct% ${t.reservedCount > 0 ? 'occupied' : 'full'}',
+                  style: _t(12, FontWeight.w400, rowStyleColor, h: 1.5),
+                ),
               ],
             ),
           ),
@@ -230,7 +244,7 @@ class _SlotsBar extends StatelessWidget {
                     duration: _ms(context, 400),
                     curve: Curves.ease,
                     builder: (context, v, _) {
-                      final minW = t.joinedCount > 0 ? 6.0 : 0.0;
+                      final minW = occupied > 0 ? 6.0 : 0.0;
                       final w = math.max(c.maxWidth * v, minW);
                       return Container(
                         width: w,

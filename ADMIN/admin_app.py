@@ -55,8 +55,11 @@ from app.services.notification_service import (
     user_ids,
 )
 from app.services.settings_service import (
+    DEFAULT_SETTINGS,
     get_add_money_method,
     get_settings,
+    save_app_popup_settings,
+    save_app_update_settings,
     save_add_money_method,
 )
 from app.services.tournament_service import (
@@ -70,6 +73,7 @@ from app.services.tournament_service import (
     list_defaults,
     list_tournaments,
     save_room_details,
+    set_simulated_slots,
 )
 
 
@@ -289,6 +293,118 @@ def payment_methods_save():
             {"ok": False, "error": "Choose Gateway or Off."}
         ), 400
     result = save_add_money_method(method)
+    return jsonify({"ok": True, **result}), 200
+
+
+@app.get("/app-update")
+def app_update():
+    settings = get_settings()
+    version_code = settings.get("appLatestVersionCode")
+    if isinstance(version_code, bool) or not isinstance(version_code, int):
+        version_code = 8
+    version_name = settings.get("appLatestVersionName")
+    if not isinstance(version_name, str):
+        version_name = "1.1.0"
+    download_url = settings.get("appDownloadUrl")
+    if not isinstance(download_url, str):
+        download_url = ""
+    message = settings.get("appUpdateMessage")
+    if not isinstance(message, str):
+        message = ""
+    return render_page(
+        "app_update.html",
+        "app_update",
+        a=obj(
+            enabled=settings.get("appUpdateEnabled") is True,
+            force=settings.get("appUpdateForce") is True,
+            version_code=version_code,
+            version_name=version_name,
+            download_url=download_url,
+            message=message,
+        ),
+    )
+
+
+@app.post("/app-update/save")
+def app_update_save():
+    body, error = _admin_json_body()
+    if error:
+        return error
+    enabled = body.get("enabled")
+    force = body.get("force")
+    version_code = body.get("versionCode")
+    if not isinstance(enabled, bool) or not isinstance(force, bool):
+        return jsonify({"ok": False, "error": "Choose valid update toggles."}), 400
+    if isinstance(version_code, bool) or not isinstance(version_code, int):
+        return jsonify(
+            {"ok": False, "error": "Version code must be a whole number."}
+        ), 400
+    try:
+        result = save_app_update_settings(
+            enabled,
+            force,
+            version_code,
+            _string_field(body, "versionName"),
+            _string_field(body, "downloadUrl"),
+            _string_field(body, "message"),
+            updated_by=session.get("admin_uid", "local-admin"),
+        )
+    except ValueError as exception:
+        return jsonify({"ok": False, "error": str(exception)}), 400
+    return jsonify({"ok": True, **result}), 200
+
+
+@app.get("/app-popup")
+def app_popup_preview():
+    settings = get_settings()
+    title = settings.get("appPopupTitle")
+    message = settings.get("appPopupMessage")
+    show_mode = settings.get("appPopupShowMode")
+    return render_page(
+        "app_popup_preview.html",
+        "app_popup",
+        a=obj(
+            enabled=settings.get("appPopupEnabled") is True,
+            title=(
+                title
+                if isinstance(title, str) and title.strip()
+                else DEFAULT_SETTINGS["appPopupTitle"]
+            ),
+            message=(
+                message
+                if isinstance(message, str) and message.strip()
+                else DEFAULT_SETTINGS["appPopupMessage"]
+            ),
+            show_mode=(
+                show_mode
+                if isinstance(show_mode, str)
+                and show_mode in {"once", "every_open"}
+                else "once"
+            ),
+        ),
+    )
+
+
+@app.post("/app-popup/save")
+def app_popup_save():
+    body, error = _admin_json_body()
+    if error:
+        return error
+    enabled = body.get("enabled")
+    if not isinstance(enabled, bool):
+        return jsonify(
+            {"ok": False, "error": "Choose whether the pop-up is enabled."}
+        ), 400
+    try:
+        result = save_app_popup_settings(
+            enabled,
+            _string_field(body, "title"),
+            _string_field(body, "message"),
+            _string_field(body, "showMode"),
+            updated_by=session.get("admin_uid", "local-admin"),
+        )
+    except ValueError as exception:
+        return jsonify({"ok": False, "error": str(exception)}), 400
     return jsonify({"ok": True, **result}), 200
 
 
@@ -513,7 +629,11 @@ def tournament_from_default(default_id):
     if not isinstance(body, dict):
         return jsonify(ok=False, error="Choose a start date and time."), 400
     try:
-        create_from_default(default_id, body.get("start"))
+        create_from_default(
+            default_id,
+            body.get("start"),
+            body.get("simulatedSlotsCount", 0),
+        )
     except TournamentInputError as exception:
         return jsonify(ok=False, error=str(exception)), 400
     return jsonify(ok=True), 201
@@ -649,6 +769,33 @@ def tournament_room_save(tid):
             )
             if notified
             else None,
+        }
+    ), 200
+
+
+@app.post("/tournaments/<tid>/simulated-slots")
+def tournament_simulated_slots_save(tid):
+    body, error = _admin_json_body()
+    if error:
+        return error
+    enabled = body.get("enabled")
+    count = body.get("count")
+    if not isinstance(enabled, bool):
+        return jsonify({"ok": False, "error": "Choose ON or OFF."}), 400
+    if isinstance(count, bool) or not isinstance(count, int):
+        return jsonify(
+            {"ok": False, "error": "Enter a whole-number reserved seat count."}
+        ), 400
+    try:
+        tournament = set_simulated_slots(tid, enabled, count)
+    except TournamentInputError as exception:
+        return jsonify({"ok": False, "error": str(exception)}), 400
+    return jsonify(
+        {
+            "ok": True,
+            "enabled": tournament["simulatedSlotsEnabled"],
+            "count": tournament["simulatedSlotsCount"],
+            "reserved": tournament["reservedCount"],
         }
     ), 200
 
@@ -884,6 +1031,7 @@ def _tournament_form(form, *, loot):
         "map": form.get("map", ""),
         "fee": 0 if loot else form.get("fee", ""),
         "slots": form.get("slots", ""),
+        "simulatedSlotsCount": form.get("simulated_slots_count", ""),
         "duration": form.get("duration", ""),
         "start": form.get("start", ""),
         "place_amt": form.getlist("place_amt"),

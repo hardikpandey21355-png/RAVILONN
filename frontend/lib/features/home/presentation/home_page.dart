@@ -112,7 +112,7 @@ class _HomePageState extends State<HomePage> {
             team: tournament.teamType,
             prize: tournament.prize,
             fee: tournament.fee,
-            players: tournament.players,
+            players: tournament.bookedPlayers,
             perKill: tournament.perKill,
             secs: tournament.secs,
             label: tournament.label,
@@ -1097,7 +1097,10 @@ class _TCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text('${t.players} Players', style: rsT(10, color: kRsMuted)),
+                  Text(
+                    '${t.bookedPlayers} Players',
+                    style: rsT(10, color: kRsMuted),
+                  ),
                   if (t.perKill != null) ...[
                     const SizedBox(height: 8),
                     Row(

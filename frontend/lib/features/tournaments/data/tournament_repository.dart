@@ -143,12 +143,23 @@ class TournamentRepository extends WidgetsBindingObserver {
       if (response['slots'] is! int || rawTaken is! List) {
         throw const FormatException('Tournament slots response is invalid.');
       }
+      final rawReserved = response['reserved'] ?? const <dynamic>[];
+      if (rawReserved is! List) {
+        throw const FormatException('Reserved slot response is invalid.');
+      }
       final taken = <int>[];
       for (final slot in rawTaken) {
         if (slot is! int) {
           throw const FormatException('Tournament slot response is invalid.');
         }
         taken.add(slot);
+      }
+      final reserved = <int>[];
+      for (final slot in rawReserved) {
+        if (slot is! int) {
+          throw const FormatException('Reserved slot response is invalid.');
+        }
+        reserved.add(slot);
       }
       final tournament = find(tournamentId);
       final teamSize = tournament == null ? 1 : _teamSize(tournament.team);
@@ -157,7 +168,12 @@ class TournamentRepository extends WidgetsBindingObserver {
           : response['teamSlots'] is int
           ? (response['teamSlots'] as int) * teamSize
           : (response['slots'] as int) * teamSize;
-      return SlotsResult(ok: true, slots: slots, taken: taken);
+      return SlotsResult(
+        ok: true,
+        slots: slots,
+        taken: taken,
+        reserved: reserved,
+      );
     } on ApiAuthException catch (error) {
       return SlotsResult(ok: false, error: error.message);
     }
@@ -283,6 +299,10 @@ class TournamentRepository extends WidgetsBindingObserver {
     final team = _text(item['team'], 'Solo');
     final map = _text(item['map'], '');
     final teamSize = _teamSize(team);
+    final joined = _integer(item['joined']);
+    final playerSlots = _integer(item['playerSlots']) > 0
+        ? _integer(item['playerSlots'])
+        : _integer(item['slots']) * teamSize;
     final fee = _integer(item['fee']);
     final perKill = _integer(item['per_kill'] ?? item['perKill']);
     final prizes = item['prizes'];
@@ -296,8 +316,7 @@ class TournamentRepository extends WidgetsBindingObserver {
       logo: 'ff',
       prize: '₹${inr(_integer(item['prize']))}',
       fee: '₹${inr(fee)}',
-      players:
-          '${_integer(item['joined'])}/${_integer(item['playerSlots']) > 0 ? _integer(item['playerSlots']) : _integer(item['slots']) * teamSize}',
+      players: '$joined/$playerSlots',
       perKill: perKill > 0 ? '₹${inr(perKill)}' : null,
       when: _text(item['when'], ''),
       secs: _integer(item['secs']),
@@ -306,6 +325,9 @@ class TournamentRepository extends WidgetsBindingObserver {
       bannerUrl: _text(item['bannerUrl'], ''),
       prizes: _prizeList(prizes),
       loot: item['loot'] == true,
+      reservedCount: _integer(item['reservedCount']),
+      joinedCount: joined,
+      playerSlots: playerSlots,
       remote: true,
       roomId: _text(item['roomId'] ?? item['room_id'], ''),
       roomPass: _text(item['roomPass'] ?? item['room_pass'], ''),
@@ -360,6 +382,7 @@ class TournamentRepository extends WidgetsBindingObserver {
           ? number(counts.last)
           : defaults.slots * _teamSize(tournament.team),
       joinedCount: counts.isEmpty ? defaults.joinedCount : number(counts.first),
+      reservedCount: tournament.reservedCount,
       secs: tournament.secs,
       label: tournament.label,
       when: tournament.when,

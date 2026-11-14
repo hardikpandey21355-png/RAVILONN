@@ -27,6 +27,7 @@ class TournamentDetail {
     this.prizes = const <(String place, int amt)>[],
     this.imageUrl = '',
     this.loot = false,
+    this.reservedCount = 0,
   });
 
   final String id;
@@ -47,6 +48,7 @@ class TournamentDetail {
   final List<(String place, int amt)> prizes;
   final String imageUrl;
   final bool loot;
+  final int reservedCount;
 
   bool get isLive => status == 'live';
   int get teamSize => switch (team) {
@@ -78,11 +80,13 @@ class SlotsResult {
     required this.ok,
     this.slots = 0,
     this.taken = const <int>[],
+    this.reserved = const <int>[],
     this.error,
   });
   final bool ok;
   final int slots;
   final List<int> taken;
+  final List<int> reserved;
   final String? error;
 }
 

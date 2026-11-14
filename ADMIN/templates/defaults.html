@@ -22,7 +22,7 @@
   <a class="btn primary" href="{{ url_for('tournament_new') }}">+ Create tournament</a>
 </section>
 {% else %}
-<p class="hint2">Pick the start date and time, then press <b>Create</b>. Everything else is filled from the default. <b>Remove</b> only deletes the default, tournaments already created are not affected.</p>
+<p class="hint2">Pick the start date and time and optionally enter reserved seats. Blank/0 keeps them OFF; each successful real join releases one reserved seat. <b>Remove</b> only deletes the default.</p>
 <div class="dlist">
   {% for t in items %}
   <div class="dcard" data-id="{{ t.id }}">
@@ -33,6 +33,8 @@
     </div>
     <div class="drow">
       <input class="inp dst" type="datetime-local" aria-label="Start date and time">
+      <input class="inp dreserved" type="number" min="0" max="{{ t.playerSlots }}" step="1"
+             placeholder="Reserved seats (optional)" aria-label="Reserved seats (optional; blank or zero turns them off)">
       <button class="btn primary dgo" type="button">Create</button>
     </div>
   </div>
@@ -48,8 +50,13 @@
     if (e.target.closest('.dgo')) {
       var st = card.querySelector('.dst').value;
       if (!st) { window.toast('Choose the start date and time first.'); return; }
+      var reservedInput = card.querySelector('.dreserved');
+      var reservedCount = reservedInput.value === '' ? 0 : Number(reservedInput.value);
+      if (!Number.isInteger(reservedCount) || reservedCount < 0 || reservedCount > Number(reservedInput.max)) {
+        window.toast('Enter a whole number between 0 and ' + reservedInput.max + '.'); return;
+      }
       busy = true;
-      window.api('/tournaments/from-default/' + id, { start: st }).then(function (r) {
+      window.api('/tournaments/from-default/' + id, { start: st, simulatedSlotsCount: reservedCount }).then(function (r) {
         busy = false;
         if (!r.ok) { window.toast(r.error || 'Something went wrong.'); return; }
         window.toast('Tournament created.');

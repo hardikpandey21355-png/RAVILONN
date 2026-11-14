@@ -250,7 +250,7 @@ class TournamentCardView extends StatelessWidget {
                     child: _kv(
                       'users',
                       const Color(0xFF22D3EE),
-                      card.players,
+                      card.bookedPlayers,
                       'Players',
                     ),
                   ),

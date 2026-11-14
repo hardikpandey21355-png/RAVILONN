@@ -26,7 +26,7 @@
 </div>
 <div class="tbl-wrap">
 <table class="tbl">
-  <tr><th>Name</th><th>Team • Map</th><th>Prize</th><th>Fee</th><th>Players</th><th>Start</th><th>Status</th><th></th></tr>
+  <tr><th>Name</th><th>Team • Map</th><th>Prize</th><th>Fee</th><th>Players</th><th>Reserved</th><th>Start</th><th>Status</th><th></th></tr>
   {% for t in items %}
   <tr data-loot="{{ 1 if t.loot else 0 }}">
     <td><a href="{{ url_for('tournament_players', tid=t.id) }}" title="See joined players"><b style="text-decoration:underline;text-underline-offset:3px">{{ t.mode }}</b></a>{% if t.loot %} <span class="pill upcoming">LOOT</span>{% endif %}</td>
@@ -34,6 +34,15 @@
     <td>₹{{ t.prize }}</td>
     <td>₹{{ t.fee }}</td>
     <td>{{ t.joined }} / {{ t.playerSlots }}</td>
+    <td>
+      <button class="btn sim-slots-btn" type="button"
+              data-id="{{ t.id }}" data-name="{{ t.mode }}"
+              data-enabled="{{ '1' if t.simulatedSlotsEnabled else '0' }}"
+              data-count="{{ t.simulatedSlotsCount }}"
+              data-max="{{ t.playerSlots }}">
+        {{ 'ON' if t.simulatedSlotsEnabled else 'OFF' }} · {{ t.reservedCount }} active
+      </button>
+    </td>
     <td>{{ t.when if t.status == 'upcoming' else '' }}{{ ' (' ~ t.duration_min ~ ' min)' if t.status == 'live' }}</td>
     <td><span class="pill {{ t.status }}">{{ t.status|capitalize }}</span></td>
     <td style="display:flex;gap:8px">
@@ -65,9 +74,26 @@
     <button class="btn primary" type="button" id="rdSave">Save</button>
   </div>
 </dialog>
+<dialog id="simDlg">
+  <h3 id="simTitle" style="font-size:16px"></h3>
+  <p style="font-size:12px;color:var(--muted);margin:4px 0 14px">
+    Reserved seats are unavailable to join and release one by one as real players join.
+  </p>
+  <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <input id="simEnabled" type="checkbox">
+    <span>Simulated slots ON</span>
+  </label>
+  <label for="simCount" style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Random reserved seats</label>
+  <input class="inp" id="simCount" type="number" min="0" step="1" autocomplete="off">
+  <p class="err" id="simErr"></p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <button class="btn" type="button" id="simCancel">Cancel</button>
+    <button class="btn primary" type="button" id="simSave">Save</button>
+  </div>
+</dialog>
 <style>
-#roomDlg{margin:auto;width:min(380px,92vw);padding:22px;border-radius:18px;color:var(--text);background:var(--panel);border:1px solid var(--line)}
-#roomDlg::backdrop{background:rgba(0,0,0,.7)}
+#roomDlg,#simDlg{margin:auto;width:min(380px,92vw);padding:22px;border-radius:18px;color:var(--text);background:var(--panel);border:1px solid var(--line)}
+#roomDlg::backdrop,#simDlg::backdrop{background:rgba(0,0,0,.7)}
 </style>
 <script>
 (function () {
@@ -94,6 +120,45 @@
           : (res.notify_error ? ' Not notified: ' + res.notify_error : '')));
         setTimeout(function () { location.reload(); }, 2200);
       });
+  });
+})();
+</script>
+
+<script>
+(function () {
+  var dlg = document.getElementById('simDlg'), cur = null, max = 0, busy = false;
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.sim-slots-btn'); if (!b) return;
+    cur = b.dataset.id; max = Number(b.dataset.max);
+    document.getElementById('simTitle').textContent = 'Simulated slots • ' + b.dataset.name;
+    document.getElementById('simEnabled').checked = b.dataset.enabled === '1';
+    var count = document.getElementById('simCount');
+    count.max = String(max); count.value = b.dataset.count; count.dataset.max = String(max);
+    document.getElementById('simErr').textContent = '';
+    dlg.showModal();
+  });
+  document.getElementById('simCancel').addEventListener('click', function () { dlg.close(); });
+  document.getElementById('simSave').addEventListener('click', function () {
+    if (busy) return;
+    var count = Number(document.getElementById('simCount').value);
+    if (!Number.isInteger(count) || count < 0 || count > max) {
+      document.getElementById('simErr').textContent = 'Enter a whole number between 0 and ' + max + '.';
+      return;
+    }
+    busy = true;
+    window.api('/tournaments/' + encodeURIComponent(cur) + '/simulated-slots', {
+      enabled: document.getElementById('simEnabled').checked,
+      count: count
+    }).then(function (res) {
+      busy = false;
+      if (!res.ok) {
+        document.getElementById('simErr').textContent = res.error || 'Could not save.';
+        return;
+      }
+      dlg.close();
+      window.toast('Simulated slots settings saved.');
+      setTimeout(function () { location.reload(); }, 900);
+    });
   });
 })();
 </script>

@@ -746,6 +746,7 @@ TournamentDetail _toTournamentDetail(Tournament tournament) {
         ? (parseNumber(playerCounts.first) ??
               (tournament.remote ? 0 : defaults.joinedCount))
         : defaults.joinedCount,
+    reservedCount: tournament.reservedCount,
     secs: tournament.secs,
     label: tournament.label,
     when: tournament.when,

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -225,11 +224,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     _ => error.message ?? 'Unable to sign in. Please try again.',
   };
 
-  void _skip() {
-    if (!kDebugMode) return;
-    Navigator.pushReplacementNamed(context, '/');
-  }
-
   // ---------- forgot password popup ----------
   void _openForgot() {
     showGeneralDialog(
@@ -340,29 +334,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
               ],
             ),
           ),
-
-          if (kDebugMode)
-            Positioned(
-              top: mq.padding.top + 10,
-              right: 14,
-              child: Pressable(
-                onTap: _skip,
-                child: Container(
-                  height: 32,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    color: c(0, 0, 0, .45),
-                    border: Border.all(color: c(255, 255, 255, .3)),
-                  ),
-                  child: Text(
-                    'Skip (testing)',
-                    style: t(11, FontWeight.w600, Colors.white),
-                  ),
-                ),
-              ),
-            ),
 
           if (_intro)
             Positioned.fill(

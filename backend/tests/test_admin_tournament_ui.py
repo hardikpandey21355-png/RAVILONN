@@ -48,6 +48,7 @@ class AdminTournamentUiTests(unittest.TestCase):
                         ("map", "Bermuda"),
                         ("fee", "25"),
                         ("slots", "48"),
+                        ("simulated_slots_count", "3"),
                         ("duration", "25"),
                         ("start", start.isoformat(timespec="minutes")),
                         ("per_kill", "10"),
@@ -63,6 +64,32 @@ class AdminTournamentUiTests(unittest.TestCase):
         create.assert_called_once()
         self.assertTrue(create.call_args.kwargs["save_as_default"])
         self.assertEqual(create.call_args.args[0]["team"], "Solo")
+        self.assertEqual(create.call_args.args[0]["simulatedSlotsCount"], "3")
+
+    def test_tournament_form_exposes_optional_reserved_count(self) -> None:
+        response = self.client.get("/tournaments/new")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'name="simulated_slots_count"', response.data)
+        self.assertIn(b"blank/0 = OFF", response.data)
+
+    def test_default_create_receives_optional_reserved_count(self) -> None:
+        with patch.object(admin_app, "create_from_default") as create:
+            response = self.client.post(
+                "/tournaments/from-default/default-1",
+                json={
+                    "start": "2027-01-10T18:00",
+                    "simulatedSlotsCount": 3,
+                },
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 201)
+        create.assert_called_once_with(
+            "default-1",
+            "2027-01-10T18:00",
+            3,
+        )
 
     def test_tournament_delete_uses_shared_service(self) -> None:
         with patch.object(admin_app, "delete_tournament") as delete:
@@ -74,6 +101,29 @@ class AdminTournamentUiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.headers["Location"], "/tournaments")
         delete.assert_called_once_with("tournament-1")
+
+    def test_simulated_slots_settings_use_shared_service(self) -> None:
+        with patch.object(
+            admin_app,
+            "set_simulated_slots",
+            return_value={
+                "simulatedSlotsEnabled": True,
+                "simulatedSlotsCount": 5,
+                "reservedCount": 5,
+            },
+        ) as configure:
+            response = self.client.post(
+                "/tournaments/tournament-1/simulated-slots",
+                json={"enabled": True, "count": 5},
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json,
+            {"ok": True, "enabled": True, "count": 5, "reserved": 5},
+        )
+        configure.assert_called_once_with("tournament-1", True, 5)
 
     def test_tournament_players_page_shows_joined_player_details(self) -> None:
         tournament = {
@@ -472,6 +522,165 @@ class AdminTournamentUiTests(unittest.TestCase):
             {"ok": False, "error": "Choose Gateway or Off."},
         )
         save_method.assert_not_called()
+
+    def test_app_update_page_displays_saved_settings_and_shared_setting_warning(self) -> None:
+        settings = {
+            "appUpdateEnabled": False,
+            "appUpdateForce": False,
+            "appLatestVersionCode": 8,
+            "appLatestVersionName": "1.1.0",
+            "appDownloadUrl": "https://example.com/Ravilon.apk",
+            "appUpdateMessage": "USB testing.",
+        }
+        with patch.object(admin_app, "get_settings", return_value=settings):
+            response = self.client.get("/app-update")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"shared Firestore project", response.data)
+        self.assertIn(b'value="8"', response.data)
+        self.assertIn(b"https://example.com/Ravilon.apk", response.data)
+
+    def test_app_popup_page_shows_settings_and_live_preview(self) -> None:
+        settings = {
+            "appPopupEnabled": False,
+            "appPopupTitle": "Ready for your next match?",
+            "appPopupMessage": "Explore tournaments, join your squad.",
+            "appPopupShowMode": "once",
+        }
+        with patch.object(admin_app, "get_settings", return_value=settings):
+            response = self.client.get("/app-popup")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"APK POP-UP SETTINGS", response.data)
+        self.assertIn(b"backdrop-filter:blur(22px)", response.data)
+        self.assertIn(b"Ready for your next match?", response.data)
+        self.assertIn(b"Explore tournaments, join your squad", response.data)
+        self.assertIn(b"@keyframes popup-scroll-cue", response.data)
+        self.assertIn(b"overflow-y:auto", response.data)
+        self.assertIn(b"max-height:calc(15.5em + 12px)", response.data)
+        self.assertIn(b"margin:0 0 24px", response.data)
+        self.assertIn(b"scrollbar-width:none", response.data)
+        self.assertIn(b"::-webkit-scrollbar-thumb", response.data)
+        self.assertIn(b"var isScrollable = message.scrollHeight > message.clientHeight + 1", response.data)
+        self.assertIn(b"message.classList.toggle('is-scrollable', isScrollable)", response.data)
+        self.assertIn(b"hint.hidden = !isScrollable", response.data)
+        self.assertIn(b"Once per account on this device", response.data)
+        self.assertIn(b"Every app open", response.data)
+        self.assertIn(b"Save pop-up settings", response.data)
+        self.assertIn(b'id="previewCloseLabel">Close</span>', response.data)
+        self.assertNotIn(b"popup-close", response.data)
+        self.assertIn(b"previewClose", response.data)
+        self.assertNotIn(b"Welcome to RIVALON", response.data)
+        self.assertNotIn(b"Explore tournaments</button>", response.data)
+        self.assertNotIn(b"Maybe later", response.data)
+        self.assertNotIn(b"popup-art", response.data)
+        self.assertIn(b"APK Pop-up", response.data)
+
+    def test_app_popup_save_calls_shared_settings_service(self) -> None:
+        result = {
+            "appPopupEnabled": True,
+            "appPopupTitle": "Title",
+            "appPopupMessage": "Message",
+            "appPopupShowMode": "every_open",
+        }
+        with patch.object(
+            admin_app,
+            "save_app_popup_settings",
+            return_value=result,
+        ) as save_settings:
+            response = self.client.post(
+                "/app-popup/save",
+                json={
+                    "enabled": True,
+                    "title": "Title",
+                    "message": "Message",
+                    "showMode": "every_open",
+                },
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"ok": True, **result})
+        save_settings.assert_called_once_with(
+            True,
+            "Title",
+            "Message",
+            "every_open",
+            updated_by="local-admin",
+        )
+
+    def test_app_popup_save_rejects_non_boolean_enabled_flag(self) -> None:
+        with patch.object(admin_app, "save_app_popup_settings") as save_settings:
+            response = self.client.post(
+                "/app-popup/save",
+                json={
+                    "enabled": "true",
+                    "title": "Title",
+                    "message": "Message",
+                    "showMode": "once",
+                },
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        save_settings.assert_not_called()
+
+    def test_app_update_save_calls_validated_shared_settings_service(self) -> None:
+        result = {
+            "appUpdateEnabled": False,
+            "appUpdateForce": False,
+            "appLatestVersionCode": 8,
+            "appLatestVersionName": "1.1.0",
+            "appDownloadUrl": "https://example.com/Ravilon.apk",
+            "appUpdateMessage": "USB testing.",
+        }
+        with patch.object(
+            admin_app,
+            "save_app_update_settings",
+            return_value=result,
+        ) as save_settings:
+            response = self.client.post(
+                "/app-update/save",
+                json={
+                    "enabled": False,
+                    "force": False,
+                    "versionCode": 8,
+                    "versionName": "1.1.0",
+                    "downloadUrl": "https://example.com/Ravilon.apk",
+                    "message": "USB testing.",
+                },
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"ok": True, **result})
+        save_settings.assert_called_once_with(
+            False,
+            False,
+            8,
+            "1.1.0",
+            "https://example.com/Ravilon.apk",
+            "USB testing.",
+            updated_by="local-admin",
+        )
+
+    def test_app_update_save_rejects_invalid_toggle_types(self) -> None:
+        with patch.object(admin_app, "save_app_update_settings") as save_settings:
+            response = self.client.post(
+                "/app-update/save",
+                json={
+                    "enabled": "false",
+                    "force": False,
+                    "versionCode": 8,
+                    "versionName": "1.1.0",
+                    "downloadUrl": "https://example.com/Ravilon.apk",
+                    "message": "",
+                },
+                headers={"X-CSRF": self._csrf()},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        save_settings.assert_not_called()
 
     def test_withdrawals_page_uses_real_service_data(self) -> None:
         rows = [

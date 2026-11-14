@@ -28,7 +28,60 @@ class AppUpdateApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 401)
 
-    def test_update_info_forces_the_current_release_despite_saved_optional_settings(self) -> None:
+    def test_app_popup_info_requires_authentication(self) -> None:
+        response = self.client.get("/api/app-popup")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_app_popup_info_returns_disabled_default_and_frequency(self) -> None:
+        settings = {
+            "appPopupEnabled": False,
+            "appPopupTitle": "Ready for your next match?",
+            "appPopupMessage": "Join a tournament.",
+            "appPopupShowMode": "once",
+        }
+        with (
+            patch("app.routes._require_user", return_value=({}, None)),
+            patch("app.routes.get_settings", return_value=settings),
+        ):
+            response = self.client.get(
+                "/api/app-popup",
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json,
+            {
+                "ok": True,
+                "enabled": False,
+                "title": "Ready for your next match?",
+                "message": "Join a tournament.",
+                "showMode": "once",
+            },
+        )
+
+    def test_app_popup_info_supports_every_open_mode(self) -> None:
+        settings = {
+            "appPopupEnabled": True,
+            "appPopupTitle": "Tournament update",
+            "appPopupMessage": "New matches are available.",
+            "appPopupShowMode": "every_open",
+        }
+        with (
+            patch("app.routes._require_user", return_value=({}, None)),
+            patch("app.routes.get_settings", return_value=settings),
+        ):
+            response = self.client.get(
+                "/api/app-popup",
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json["enabled"])
+        self.assertEqual(response.json["showMode"], "every_open")
+
+    def test_update_info_honors_disabled_update_settings(self) -> None:
         settings = {
             "maintenance": False,
             "appUpdateEnabled": False,
@@ -53,14 +106,60 @@ class AppUpdateApiTests(unittest.TestCase):
             response.json,
             {
                 "ok": True,
-                "enabled": True,
-                "forceUpdate": True,
+                "enabled": False,
+                "forceUpdate": False,
                 "latestBuildNumber": 8,
                 "latestVersionName": "1.1.0",
                 "downloadUrl": "https://example.com/Ravilon.apk",
-                "message": "App use karte rehne ke liye latest update install karein.",
+                "message": "An update is available.",
             },
         )
+
+    def test_update_info_can_be_enabled_without_being_mandatory(self) -> None:
+        settings = {
+            "appUpdateEnabled": True,
+            "appUpdateForce": False,
+            "appLatestVersionCode": 9,
+            "appLatestVersionName": "1.2.0",
+            "appDownloadUrl": "https://example.com/Ravilon.apk",
+            "appUpdateMessage": "Optional update.",
+        }
+        with (
+            patch("app.routes._require_user", return_value=({}, None)),
+            patch("app.routes.get_settings", return_value=settings),
+        ):
+            response = self.client.get(
+                "/api/app-update",
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json["enabled"])
+        self.assertFalse(response.json["forceUpdate"])
+        self.assertEqual(response.json["latestBuildNumber"], 9)
+        self.assertEqual(response.json["message"], "Optional update.")
+
+    def test_update_info_can_be_enabled_and_mandatory(self) -> None:
+        settings = {
+            "appUpdateEnabled": True,
+            "appUpdateForce": True,
+            "appLatestVersionCode": 9,
+            "appLatestVersionName": "1.2.0",
+            "appDownloadUrl": "https://example.com/Ravilon.apk",
+            "appUpdateMessage": "Update required.",
+        }
+        with (
+            patch("app.routes._require_user", return_value=({}, None)),
+            patch("app.routes.get_settings", return_value=settings),
+        ):
+            response = self.client.get(
+                "/api/app-update",
+                headers=self.auth_headers(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json["enabled"])
+        self.assertTrue(response.json["forceUpdate"])
 
     def test_update_reward_claim_is_disabled_even_if_saved_setting_enables_it(self) -> None:
         settings = {

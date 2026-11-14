@@ -46,6 +46,9 @@ void main() {
               prize: '₹250',
               fee: '₹10',
               players: '0/24',
+              joinedCount: 2,
+              playerSlots: 24,
+              reservedCount: 5,
               when: 'Tomorrow',
               secs: 3600,
               label: 'Starts in',
@@ -58,6 +61,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('Admin Event'), findsWidgets);
+    expect(find.text('7/24'), findsWidgets);
+    expect(find.text('2 real · 5 reserved'), findsNothing);
     expect(find.text('No tournaments yet'), findsNothing);
     expect(find.text('₹500'), findsNothing);
   });
@@ -97,7 +102,9 @@ void main() {
     expect(find.text('Finished Match'), findsNothing);
   });
 
-  testWidgets('tapping a tournament hero opens that tournament', (tester) async {
+  testWidgets('tapping a tournament hero opens that tournament', (
+    tester,
+  ) async {
     String? openedTournament;
     await tester.pumpWidget(
       MaterialApp(

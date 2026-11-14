@@ -1,0 +1,184 @@
+{% extends "_layout.html" %}
+{% block title %}APK Pop-up{% endblock %}
+{% block content %}
+<style>
+.preview-intro{max-width:760px;margin-bottom:18px}
+.preview-intro p{font-size:12px;color:var(--muted);line-height:1.55;margin-top:5px}
+.preview-only{display:inline-flex;align-items:center;gap:7px;padding:5px 9px;border:1px solid rgba(130,156,245,.38);border-radius:999px;color:#bdcaff;background:rgba(130,156,245,.1);font-size:10px;font-weight:700;letter-spacing:.04em}
+.popup-config{max-width:760px;margin-bottom:20px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--panel);display:grid;gap:12px}
+.popup-config label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px}
+.popup-config .toggle{flex-direction:row;align-items:center;gap:10px}
+.popup-config input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+.popup-config textarea{min-height:110px;resize:vertical}
+.popup-warning{color:#f5d58b;font-size:12px;line-height:1.5}
+.preview-stage{min-height:650px;display:grid;place-items:center;overflow:hidden;padding:28px;border:1px solid var(--line);border-radius:20px;background:radial-gradient(ellipse at 50% 40%,#202638 0,#111318 48%,#0b0b0d 100%)}
+.phone{position:relative;width:min(340px,100%);height:590px;overflow:hidden;border:7px solid #25262b;border-radius:38px;background:#0b0e13;box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.1)}
+.phone-top{height:34px;display:flex;align-items:center;justify-content:center;color:#e8eaf2;font-size:10px}
+.phone-island{position:absolute;top:8px;left:50%;width:76px;height:17px;transform:translateX(-50%);border-radius:999px;background:#020305}
+.app-screen{height:calc(100% - 34px);padding:16px 15px;background:radial-gradient(ellipse at 90% 0,rgba(42,91,78,.4),transparent 40%),#0b0e13}
+.app-brand{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.14em}
+.app-mark{width:30px;height:30px;display:grid;place-items:center;border:1px solid rgba(107,230,188,.45);border-radius:10px;color:#80ebc4;background:rgba(64,180,139,.12)}
+.app-greeting{margin-top:24px;color:#aab1bf;font-size:11px}
+.app-screen h2{margin-top:3px;font-size:22px}
+.app-hero{height:145px;margin-top:17px;padding:15px;display:flex;flex-direction:column;justify-content:flex-end;border:1px solid rgba(121,230,193,.25);border-radius:19px;background:linear-gradient(145deg,rgba(47,125,103,.8),rgba(22,31,42,.88) 65%,rgba(12,18,27,.95));box-shadow:inset 0 1px rgba(255,255,255,.1)}
+.app-hero small{color:#b8f5dd;font-size:9px;letter-spacing:.13em}
+.app-hero b{margin-top:6px;font-size:16px}
+.app-row{height:64px;margin-top:12px;padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:13px;background:rgba(255,255,255,.035);display:flex;justify-content:space-between;align-items:center}
+.app-row b{display:block;font-size:11px}.app-row small{color:#9ba2af;font-size:9px}
+.app-nav{position:absolute;bottom:15px;left:15px;right:15px;display:flex;justify-content:space-around;color:#9da5b3;font-size:9px}
+.preview-dimmer{position:absolute;inset:0;display:grid;place-items:center;padding:19px;background:rgba(5,8,13,.38);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:opacity .2s}
+.preview-dimmer[hidden]{display:none}
+.popup-card{width:100%;padding:22px 20px 17px;text-align:center;border:1px solid rgba(255,255,255,.23);border-radius:19px;background:linear-gradient(150deg,rgba(30,40,47,.82),rgba(17,24,32,.74));box-shadow:0 24px 55px rgba(0,0,0,.4),inset 0 1px rgba(255,255,255,.16);backdrop-filter:blur(22px) saturate(135%);-webkit-backdrop-filter:blur(22px) saturate(135%)}
+.popup-card h3{margin:0 0 24px;font-size:16px;line-height:1.4}
+.popup-message-wrap{position:relative;margin:0 0 14px}
+.popup-copy{max-height:calc(15.5em + 12px);overflow-y:hidden;padding:0 3px 12px;color:#c0c9cd;font-size:12px;line-height:1.55;scrollbar-width:none;-ms-overflow-style:none}
+.popup-copy.is-scrollable{overflow-y:auto}
+.popup-copy::-webkit-scrollbar,.popup-copy::-webkit-scrollbar-thumb,.popup-copy::-webkit-scrollbar-track{display:none!important;width:0!important;height:0!important;background:transparent!important}
+.scroll-hint{position:absolute;right:0;bottom:0;left:0;height:26px;display:grid;place-items:end center;padding-bottom:0;background:linear-gradient(180deg,rgba(24,32,39,0),rgba(24,32,39,.92) 72%);pointer-events:none}
+.scroll-hint[hidden]{display:none}
+.scroll-hint span{color:#9be9cb;font-size:17px;line-height:18px;animation:popup-scroll-cue 1s ease-in-out infinite}
+@keyframes popup-scroll-cue{0%,100%{transform:translateY(-2px);opacity:.65}50%{transform:translateY(3px);opacity:1}}
+.popup-dismiss{width:100%;height:38px;border:1px solid rgba(255,255,255,.16);border-radius:12px;color:#e3e9e9;background:rgba(255,255,255,.07);font:600 11px 'Poppins',sans-serif}
+.popup-dismiss:hover{background:rgba(255,255,255,.12)}
+.popup-optout{margin-top:7px;padding:4px 8px;border:0;color:#b8c6c3;background:transparent;font:500 10px 'Poppins',sans-serif}
+.popup-optout:hover{color:#e3e9e9}
+.popup-optout[hidden]{display:none}
+.preview-restore{margin-top:14px;color:#bdcaff;font-size:12px}
+.preview-restore[hidden]{display:none}
+@media(max-width:600px){.preview-stage{min-height:620px;padding:14px}.phone{height:min(590px,calc(100vh - 180px))}.app-screen h2{font-size:20px}}
+</style>
+
+<div class="preview-intro">
+  <span class="preview-only">APK POP-UP SETTINGS</span>
+  <p>Choose whether the pop-up is enabled and how often it appears. Saving updates the shared app setting; it does not upload, install, or release an APK.</p>
+</div>
+
+<div class="popup-config">
+  <label class="toggle"><input id="popupEnabled" type="checkbox" {{ 'checked' if a.enabled }}>
+    <span>Enable pop-up for app users</span></label>
+  <label>Title
+    <input class="inp" id="popupTitle" maxlength="80" autocomplete="off" value="{{ a.title }}"></label>
+  <label>Message
+    <textarea class="inp" id="popupMessage" maxlength="2000">{{ a.message }}</textarea></label>
+  <label>Show frequency
+    <select class="inp" id="popupShowMode">
+      <option value="once" {{ 'selected' if a.show_mode == 'once' }}>Once per account on this device</option>
+      <option value="every_open" {{ 'selected' if a.show_mode == 'every_open' }}>Every app open</option>
+    </select></label>
+  <p class="popup-warning">Saving changes the shared live setting. Keep this OFF until USB testing is approved.</p>
+  <p class="err" id="popupError"></p>
+  <button class="btn primary wide" type="button" id="savePopup">Save pop-up settings</button>
+</div>
+
+<section class="preview-stage" aria-label="RIVALON APK pop-up design preview">
+  <div class="phone">
+    <div class="phone-top"><span class="phone-island"></span>9:41</div>
+    <div class="app-screen">
+      <div class="app-brand"><span class="app-mark">R</span> RIVALON</div>
+      <p class="app-greeting">Good evening</p>
+      <h2>Find your next match</h2>
+      <div class="app-hero"><small>UPCOMING TOURNAMENT</small><b>Weekend Clash Squad</b></div>
+      <div class="app-row"><div><b>Solo Showdown</b><small>Starts tonight · Entry ₹10</small></div><span>›</span></div>
+      <div class="app-row"><div><b>Squad Wars</b><small>Join the next lobby</small></div><span>›</span></div>
+      <div class="app-nav"><span>Home</span><span>Tournaments</span><span>Wallet</span><span>Profile</span></div>
+    </div>
+    <div class="preview-dimmer" id="previewDimmer">
+      <section class="popup-card" role="dialog" aria-modal="true" aria-labelledby="previewTitle" aria-describedby="previewCopy">
+        <h3 id="previewTitle">{{ a.title }}</h3>
+        <div class="popup-message-wrap">
+          <div class="popup-copy" id="previewCopy" tabindex="0">
+            {{ a.message }}
+          </div>
+          <div class="scroll-hint" id="scrollHint" aria-hidden="true"><span>↓</span></div>
+        </div>
+        <button class="popup-dismiss" id="previewClose" type="button"><span id="previewCloseLabel">Close</span></button>
+        <button class="popup-optout" id="previewOptOut" type="button" hidden>Don't show again on this device</button>
+      </section>
+    </div>
+  </div>
+</section>
+<button class="preview-restore" id="previewRestore" type="button" hidden>Show pop-up preview again</button>
+
+<script>
+(function () {
+  var dimmer = document.getElementById('previewDimmer');
+  var restore = document.getElementById('previewRestore');
+  var message = document.getElementById('previewCopy');
+  var hint = document.getElementById('scrollHint');
+  var titleInput = document.getElementById('popupTitle');
+  var messageInput = document.getElementById('popupMessage');
+  var previewTitle = document.getElementById('previewTitle');
+  var showMode = document.getElementById('popupShowMode');
+  var closeLabel = document.getElementById('previewCloseLabel');
+  var optOut = document.getElementById('previewOptOut');
+  var popupBusy = false;
+  function closePreview() {
+    dimmer.hidden = true;
+    restore.hidden = false;
+  }
+  function updateScrollHint() {
+    var isScrollable = message.scrollHeight > message.clientHeight + 1;
+    message.classList.toggle('is-scrollable', isScrollable);
+    hint.hidden = !isScrollable ||
+      message.scrollTop + message.clientHeight >= message.scrollHeight - 2;
+  }
+  message.addEventListener('scroll', updateScrollHint);
+  window.addEventListener('resize', updateScrollHint);
+  updateScrollHint();
+  titleInput.addEventListener('input', function () {
+    previewTitle.textContent = titleInput.value;
+  });
+  messageInput.addEventListener('input', function () {
+    message.textContent = messageInput.value;
+    updateScrollHint();
+  });
+  function updatePreviewFrequency() {
+    var recurring = showMode.value === 'every_open';
+    closeLabel.textContent = recurring ? 'Not now' : 'Close';
+    optOut.hidden = !recurring;
+  }
+  showMode.addEventListener('change', updatePreviewFrequency);
+  updatePreviewFrequency();
+  document.getElementById('savePopup').addEventListener('click', function () {
+    if (popupBusy) return;
+    if (!confirm('These settings affect the shared app pop-up. Continue?')) return;
+    popupBusy = true;
+    this.disabled = true;
+    document.getElementById('popupError').textContent = '';
+    var button = this;
+    window.api('/app-popup/save', {
+      enabled: document.getElementById('popupEnabled').checked,
+      title: titleInput.value,
+      message: messageInput.value,
+      showMode: document.getElementById('popupShowMode').value
+    }).then(function (response) {
+      popupBusy = false;
+      button.disabled = false;
+      if (!response.ok) {
+        document.getElementById('popupError').textContent =
+          response.error || 'Could not save pop-up settings.';
+        return;
+      }
+      window.toast('Saved. Pop-up settings are now active.');
+    }).catch(function () {
+      popupBusy = false;
+      button.disabled = false;
+      document.getElementById('popupError').textContent =
+        'Could not save pop-up settings.';
+    });
+  });
+  document.getElementById('previewClose').addEventListener('click', closePreview);
+  optOut.addEventListener('click', closePreview);
+  dimmer.addEventListener('click', function (event) {
+    if (event.target === dimmer) closePreview();
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && !dimmer.hidden) closePreview();
+  });
+  restore.addEventListener('click', function () {
+    dimmer.hidden = false;
+    restore.hidden = true;
+  });
+})();
+</script>
+{% endblock %}

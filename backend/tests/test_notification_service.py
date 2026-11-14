@@ -2,6 +2,8 @@ import unittest
 from typing import Any
 from unittest.mock import patch
 
+from firebase_admin import firestore, messaging
+
 from app.services.notification_service import (
     NotificationInputError,
     enabled_device_count,
@@ -33,6 +35,14 @@ class Document:
 
     def set(self, value: dict[str, Any]) -> None:
         self.db.data[self.collection][self.id] = dict(value)
+
+    def update(self, values: dict[str, Any]) -> None:
+        document = self.db.data[self.collection][self.id]
+        for key, value in values.items():
+            if value is firestore.DELETE_FIELD:
+                document.pop(key, None)
+            else:
+                document[key] = value
 
 
 class Collection:
@@ -126,6 +136,78 @@ class NotificationServiceTests(unittest.TestCase):
         self.assertEqual(log["pushStatus"], "failed")
         self.assertEqual(log["error"], "ValueError")
         self.assertNotIn("token-for-test", str(log))
+
+    def test_removes_only_the_unregistered_fid_that_failed(self) -> None:
+        db = FakeFirestore()
+
+        def run_transaction(_db: FakeFirestore, operation: Any) -> None:
+            class Transaction:
+                def get(self, reference: Document) -> Snapshot:
+                    return reference.get()
+
+                def update(self, reference: Document, values: dict[str, Any]) -> None:
+                    reference.update(values)
+
+            operation(Transaction())
+
+        with (
+            patch(
+                "app.services.notification_service.messaging.send",
+                side_effect=messaging.UnregisteredError("FID is no longer registered"),
+            ),
+            patch(
+                "app.services.notification_service.run_transaction",
+                side_effect=run_transaction,
+            ),
+        ):
+            counts = notify_users(
+                ["with-device"],
+                "Account update",
+                "Please review your account information.",
+                "/profile",
+                db=db,
+            )
+
+        self.assertEqual(counts["failed"], 1)
+        self.assertNotIn("fcmToken", db.data["users"]["with-device"])
+        log = next(iter(db.data["adminNotificationLogs"].values()))
+        self.assertEqual(log["pushStatus"], "failed")
+        self.assertEqual(log["error"], "UnregisteredError")
+
+    def test_does_not_remove_a_refreshed_fid_after_an_old_fid_fails(self) -> None:
+        db = FakeFirestore()
+
+        def run_transaction(_db: FakeFirestore, operation: Any) -> None:
+            db.data["users"]["with-device"]["fcmToken"] = "new-token"
+
+            class Transaction:
+                def get(self, reference: Document) -> Snapshot:
+                    return reference.get()
+
+                def update(self, reference: Document, values: dict[str, Any]) -> None:
+                    reference.update(values)
+
+            operation(Transaction())
+
+        with (
+            patch(
+                "app.services.notification_service.messaging.send",
+                side_effect=messaging.UnregisteredError("FID is no longer registered"),
+            ),
+            patch(
+                "app.services.notification_service.run_transaction",
+                side_effect=run_transaction,
+            ),
+        ):
+            notify_users(
+                ["with-device"],
+                "Account update",
+                "Please review your account information.",
+                "/profile",
+                db=db,
+            )
+
+        self.assertEqual(db.data["users"]["with-device"]["fcmToken"], "new-token")
 
     def test_rejects_external_notification_links(self) -> None:
         with self.assertRaisesRegex(NotificationInputError, "destination"):

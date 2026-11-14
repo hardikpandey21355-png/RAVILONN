@@ -54,6 +54,7 @@ class JoinSheetState extends State<JoinSheet> {
   bool _failed = false;
   int _slotCount = 0;
   Set<int> _taken = <int>{};
+  Set<int> _reserved = <int>{};
   int _loadSeq = 0;
 
   final TextEditingController _amt = TextEditingController();
@@ -145,6 +146,8 @@ class JoinSheetState extends State<JoinSheet> {
     setState(() {
       _loading = true;
       _failed = false;
+      _taken = <int>{};
+      _reserved = <int>{};
     });
     SlotsResult res;
     try {
@@ -164,6 +167,7 @@ class JoinSheetState extends State<JoinSheet> {
         _failed = false;
         _slotCount = res.slots;
         _taken = res.taken.toSet();
+        _reserved = res.reserved.toSet();
       }
     });
   }
@@ -322,13 +326,14 @@ class JoinSheetState extends State<JoinSheet> {
           _field(),
         ],
         if (_mode == SheetMode.join) ...<Widget>[
-          _legend(loot),
+          _legend(loot, _reserved.isNotEmpty),
           SlotGrid(
             loading: _loading,
             failed: _failed,
             slots: _slotCount,
             teamSize: widget.t.teamSize,
             taken: _taken,
+            reserved: _reserved,
             picked: _picked,
             loot: loot,
             onPick: _pick,
@@ -507,7 +512,7 @@ class JoinSheetState extends State<JoinSheet> {
     );
   }
 
-  Widget _legend(bool loot) {
+  Widget _legend(bool loot, bool hasReserved) {
     Widget key(Color bg, Color? border, String label) {
       return Row(
         mainAxisSize: MainAxisSize.min,
@@ -531,13 +536,19 @@ class JoinSheetState extends State<JoinSheet> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 6,
         children: <Widget>[
           key(const Color(0xFF141414), const Color(0xFF333333), 'Free'),
-          const SizedBox(width: 14),
           key(const Color(0xFF0A0A0A), const Color(0xFF1C1C1C), 'Booked'),
-          const SizedBox(width: 14),
           key(loot ? _lootGold : const Color(0xFF22B08A), null, 'Yours'),
+          if (hasReserved)
+            key(
+              const Color(0xFF211A0B),
+              const Color(0xFF8A6A22),
+              'Reserved · opens as players join',
+            ),
         ],
       ),
     );
